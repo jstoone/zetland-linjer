@@ -18,6 +18,16 @@ export function isSubmitted(): boolean {
   return localStorage.getItem(SUBMITTED_KEY) === "true";
 }
 
+export function getStoredConnections(): Connection[] {
+  const raw = localStorage.getItem(CONNECTIONS_KEY);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as Connection[];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Submit connections to Supabase.
  * Box indices are 0-based internally — we store 1-based in the DB.

@@ -1,7 +1,7 @@
 import { Application } from "pixi.js";
 import { createGrid } from "./grid";
 import { Connection, setupConnections } from "./connections";
-import { isSubmitted, submitConnections } from "./submit";
+import { isSubmitted, getStoredConnections, submitConnections } from "./submit";
 
 const app = new Application();
 
@@ -22,9 +22,18 @@ const manager = setupConnections(app, boxes);
 const resetBtn = document.getElementById("reset-btn") as HTMLButtonElement;
 const undoToast = document.getElementById("undo-toast") as HTMLDivElement;
 const submitBtn = document.getElementById("submit-btn") as HTMLButtonElement;
+const resultsBtn = document.getElementById("results-btn") as HTMLButtonElement;
 const submitError = document.getElementById("submit-error") as HTMLDivElement;
 
 let submitted = isSubmitted();
+
+// Restore connections from localStorage if previously submitted
+if (submitted) {
+  const stored = getStoredConnections();
+  manager.connections.push(...stored);
+  manager.redraw();
+  resultsBtn.style.display = "";
+}
 let undoBackup: Connection[] | null = null;
 let undoTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -89,6 +98,7 @@ submitBtn.addEventListener("click", async () => {
     submitted = true;
     submitBtn.style.display = "none";
     resetBtn.style.display = "none";
+    resultsBtn.style.display = "";
   } catch (err) {
     submitBtn.disabled = false;
     submitBtn.textContent = "Send";

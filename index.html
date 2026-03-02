@@ -65,6 +65,24 @@
         opacity: 0.5;
         cursor: default;
       }
+      #results-btn {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        padding: 12px 32px;
+        font-size: 16px;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-weight: 700;
+        color: #fff;
+        background: rgba(15, 52, 96, 0.9);
+        border: none;
+        border-radius: 24px;
+        cursor: pointer;
+        z-index: 10;
+        -webkit-tap-highlight-color: transparent;
+        display: none;
+      }
+      #results-btn:active { background: rgba(22, 66, 120, 0.95); }
       #submit-error {
         position: fixed;
         bottom: 80px;
@@ -85,6 +103,7 @@
     <button id="reset-btn">Nulstil</button>
     <div id="undo-toast">Fortryd</div>
     <button id="submit-btn">Send</button>
+    <button id="results-btn">Se resultater</button>
     <div id="submit-error"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
