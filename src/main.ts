@@ -1,4 +1,5 @@
 import { Application } from "pixi.js";
+import { createGrid } from "./grid";
 
 const app = new Application();
 
@@ -11,3 +12,5 @@ await app.init({
 });
 
 document.body.appendChild(app.canvas);
+
+createGrid(app);
