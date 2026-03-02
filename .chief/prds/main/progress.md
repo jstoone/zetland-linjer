@@ -192,3 +192,14 @@
   - Adding `transition: background 0.15s ease` to buttons gives a more polished feel on touch interactions
   - The `.btn` shared class pattern reduces CSS duplication across multiple button styles
 ---
+
+## 2026-03-02 - US-012
+- Added a persistent instructional header at the top of the screen with Danish text: "Tegn linjer mellem begivenhederne — hvad har ført til hvad?"
+- Header uses a gradient background (solid at top, fading to transparent) so it blends into the canvas without a hard edge
+- `pointer-events: none` ensures the header doesn't block touch interaction with the grid underneath
+- Files changed: `index.html`
+- **Learnings for future iterations:**
+  - `pointer-events: none` on overlay elements is essential to prevent them from capturing touch events meant for the canvas
+  - A `linear-gradient(to bottom, var(--bg) 60%, transparent)` background provides a clean fade effect that avoids a harsh dividing line
+  - Fixed-position overlays with `z-index: 10` sit above the PIXI canvas consistently across mobile browsers
+---

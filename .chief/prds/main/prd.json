@@ -172,7 +172,7 @@
         "The instruction is concise (one sentence)"
       ],
       "priority": 12,
-      "passes": false
+      "passes": true
     }
   ]
 }
