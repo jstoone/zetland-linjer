@@ -1,0 +1,179 @@
+{
+  "project": "Linjer — Interactive Causality Drawing App",
+  "description": "Linjer is a mobile-first interactive web app used during a live Zetland event at Øster Gasværk (Copenhagen). Journalist Jakob Moll gives a talk about \"the narrative fallacy\" — the human tendency to construct causal stories from random events (inspired by Nassim Nicholas Taleb's work). The audience (~800 people) opens the app on their phones and sees a grid of 11 boxes containing historical events and phenomena arranged in tiers. They draw lines between boxes to show perceived causal connections (\"What led to what?\"). After submitting, they can view aggregate results showing which connections the rest of the audience drew. The punchline of the talk: everyone confidently draws different causal chains, revealing how we construct narratives after the fact. The app is the mirror that shows this bias in action. This is a short-lived project — it will be taken down the day after the event.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Set up project with PIXI.js canvas",
+      "description": "As a developer, I need a working PIXI.js canvas app scaffold so that all subsequent visual work has a foundation.",
+      "acceptanceCriteria": [
+        "Project initialized with PIXI.js (or equivalent canvas library)",
+        "Full-viewport canvas renders on mobile and desktop browsers",
+        "Canvas is responsive — fills the screen and adapts to orientation",
+        "A basic colored background renders to confirm PIXI is working",
+        "The app can be served locally for development"
+      ],
+      "priority": 1,
+      "passes": false,
+      "inProgress": true
+    },
+    {
+      "id": "US-002",
+      "title": "Render the box grid layout",
+      "description": "As a user, I want to see a grid of labeled boxes on my phone screen so I can understand the exercise at a glance.",
+      "acceptanceCriteria": [
+        "11 boxes rendered in a 3-3-3-2 layout (3 boxes in top three rows, 2 boxes centered in the bottom row)",
+        "Top row represents \"current world order\" (Tier 4), bottom row represents \"deep structural forces\" (Tier 1)",
+        "Each box displays a short text label (the historical event/phenomenon name)",
+        "Text fits inside the box and is readable on a phone screen (min ~375px viewport width)",
+        "Box labels are defined in a single ordered config array where the array index corresponds to the box number (1-based, bottom-left to top-right: positions 1–2 = bottom row, 3–5, 6–8, 9–11 = top row). Moll can easily swap labels out",
+        "Boxes are visually distinct with rounded corners, clear borders, and adequate spacing between them",
+        "The layout is centered and looks good on typical phone screens (375px–430px width)"
+      ],
+      "priority": 2,
+      "passes": false
+    },
+    {
+      "id": "US-003",
+      "title": "Draw lines between boxes by dragging",
+      "description": "As a user, I want to drag from one box to another to draw a causal connection, because it feels natural and playful on a touchscreen.",
+      "acceptanceCriteria": [
+        "Touch-dragging from one box to another creates a visible line/arrow between them",
+        "While dragging, a preview line follows the user's finger from the source box to the current touch position",
+        "If the drag ends on a valid target box, the line is committed and stays visible",
+        "If the drag ends outside any box, the preview line disappears (no connection made)",
+        "Lines are drawn as curves or routed paths that avoid overlapping other boxes where possible",
+        "Connections are unrestricted — users can connect any box to any other box regardless of tier",
+        "Each connection is visually styled (e.g., a colored line with an arrowhead or dot indicating direction)",
+        "Drawing feels smooth at 60fps on a modern phone"
+      ],
+      "priority": 3,
+      "passes": false
+    },
+    {
+      "id": "US-004",
+      "title": "Draw lines between boxes by tap-tap (fallback)",
+      "description": "As a user, if I find dragging awkward, I want to tap two boxes in sequence to create a connection.",
+      "acceptanceCriteria": [
+        "Tapping a box selects it (visual highlight, e.g., a glow or color change)",
+        "Tapping a second box creates a line from the first to the second",
+        "After a connection is made, selection is cleared (ready for the next connection)",
+        "Tapping the same box twice deselects it (cancels the selection)",
+        "Both drag and tap-tap work simultaneously without conflicting"
+      ],
+      "priority": 4,
+      "passes": false
+    },
+    {
+      "id": "US-005",
+      "title": "Remove individual connections",
+      "description": "As a user, I want to remove a connection I made so I can change my mind without resetting everything.",
+      "acceptanceCriteria": [
+        "Drawing the same connection again (same source and target) removes/toggles it off",
+        "Alternatively, tapping on an existing line removes it",
+        "The line disappears immediately with a brief visual feedback (e.g., fade out)"
+      ],
+      "priority": 5,
+      "passes": false
+    },
+    {
+      "id": "US-006",
+      "title": "Reset all connections",
+      "description": "As a user, I want a reset button to clear all my lines and start over, so I can rethink my answer.",
+      "acceptanceCriteria": [
+        "A clearly visible \"Reset\" / \"Nulstil\" button is present on screen",
+        "Pressing it clears all drawn connections",
+        "A brief confirmation or undo option is shown to prevent accidental resets (can be as simple as a 3-second \"Undo\" toast)"
+      ],
+      "priority": 6,
+      "passes": false
+    },
+    {
+      "id": "US-007",
+      "title": "Submit connections to Supabase",
+      "description": "As a user, I want to submit my drawn connections so they are saved and included in the aggregate results.",
+      "acceptanceCriteria": [
+        "A \"Submit\" / \"Send\" button is visible once at least one connection has been drawn",
+        "Pressing submit sends the user's connections to the Supabase connections table via the JS SDK",
+        "Each connection is inserted as its own row with the user's session_id, source_box, and target_box",
+        "The session_id is a unique anonymous ID generated client-side (e.g. crypto.randomUUID()) and stored in localStorage",
+        "The submit button is disabled/hidden after successful submission to prevent duplicate submissions",
+        "If submission fails (network error), an error message is shown and the user can retry",
+        "The Supabase table allows anonymous inserts (no auth required)",
+        "Once submitted, the user cannot modify or resubmit — localStorage tracks the \"submitted\" state"
+      ],
+      "priority": 7,
+      "passes": false
+    },
+    {
+      "id": "US-008",
+      "title": "Persist submission in localStorage",
+      "description": "As a user, I want my submission to survive a page reload so I don't lose my data.",
+      "acceptanceCriteria": [
+        "After successful submission, the user's connections and anonymous ID are saved to localStorage",
+        "On page load, if localStorage contains a previous submission, the app restores that state (shows the submitted connections, hides the submit button, shows the \"Show Results\" button)",
+        "The user's own connections are re-rendered on the canvas from localStorage"
+      ],
+      "priority": 8,
+      "passes": false
+    },
+    {
+      "id": "US-009",
+      "title": "Set up Supabase table for connections",
+      "description": "As a developer, I need a Supabase table to store audience connections (one row per connection drawn).",
+      "acceptanceCriteria": [
+        "A connections table exists with columns: id (uuid, primary key, default gen_random_uuid()), session_id (text, not null), source_box (smallint, not null), target_box (smallint, not null), created_at (timestamptz, default now())",
+        "Box numbers use 1-based indexing, counted from the bottom-left of the grid, left-to-right, bottom-to-top (bottom row: 1–2, next row: 3–5, next: 6–8, top row: 9–11)",
+        "No unique constraints — trust the client/localStorage to prevent duplicates",
+        "RLS is enabled with a policy that permits anonymous inserts (no auth required)",
+        "RLS policy permits anonymous selects (no auth required) for reading aggregate results",
+        "The Supabase project URL is https://msjzqyhdfohxrhdovjxq.supabase.co"
+      ],
+      "priority": 9,
+      "passes": false
+    },
+    {
+      "id": "US-010",
+      "title": "Show aggregate results with heatmap overlay",
+      "description": "As a user, after submitting I want to see what connections others drew, so I can compare my thinking with the crowd.",
+      "acceptanceCriteria": [
+        "After submitting, a \"Show Results\" / \"Se resultater\" button appears",
+        "Pressing the button fetches aggregate connection counts from Supabase (e.g. SELECT source_box, target_box, COUNT(*) FROM connections GROUP BY source_box, target_box)",
+        "The query returns one row per unique connection with its count — no client-side aggregation needed",
+        "Aggregate connections are rendered as lines with visual weight (thicker = more people drew it) or with a count label",
+        "The user's own connections are highlighted in a distinct color so they stand out against the aggregate",
+        "The user can press the button again to refresh/update the results (results trickle in as more people submit)"
+      ],
+      "priority": 10,
+      "passes": false
+    },
+    {
+      "id": "US-011",
+      "title": "Visual polish and color theming",
+      "description": "As a user, I want the app to look clean, modern, and inviting so I feel encouraged to participate.",
+      "acceptanceCriteria": [
+        "The app has a cohesive color palette that can be easily changed (colors defined as constants/config)",
+        "Boxes have a clean, modern look (subtle shadows or borders, readable text)",
+        "Lines are smooth (bezier curves or similar, not jagged straight lines)",
+        "The overall aesthetic is minimal and playful — not corporate or cluttered",
+        "No sound effects",
+        "The app works in both light and dark environments (theater lighting may be dim)"
+      ],
+      "priority": 11,
+      "passes": false
+    },
+    {
+      "id": "US-012",
+      "title": "Simple instructional header",
+      "description": "As a user, I need a brief instruction so I understand what to do without Moll having to explain the UI.",
+      "acceptanceCriteria": [
+        "A short instructional text is shown at the top or as an overlay on first load, e.g.: \"Tegn linjer mellem begivenhederne. Hvad har ført til hvad?\" (\"Draw lines between the events. What led to what?\")",
+        "The instruction is in Danish",
+        "It does not obstruct the grid — either a small persistent header or a dismissible overlay",
+        "The instruction is concise (one sentence)"
+      ],
+      "priority": 12,
+      "passes": false
+    }
+  ]
+}
