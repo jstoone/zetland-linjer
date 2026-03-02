@@ -14,8 +14,7 @@
         "The app can be served locally for development"
       ],
       "priority": 1,
-      "passes": false,
-      "inProgress": true
+      "passes": true
     },
     {
       "id": "US-002",
@@ -31,7 +30,7 @@
         "The layout is centered and looks good on typical phone screens (375px–430px width)"
       ],
       "priority": 2,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-003",
