@@ -20,6 +20,8 @@ const ARROW_SIZE = 8;
 const CURVE_OFFSET_RATIO = 0.15;
 const TAP_THRESHOLD = 10;
 const HIGHLIGHT_RADIUS = 10;
+const LINE_HIT_THRESHOLD = 20;
+const FADE_SPEED = 0.04;
 
 export interface ConnectionManager {
   connections: Connection[];
@@ -48,6 +50,17 @@ export function setupConnections(
   let dragStartX = 0;
   let dragStartY = 0;
   let selectedBoxIndex: number | null = null;
+
+  function toggle(source: number, target: number) {
+    const idx = connections.findIndex(
+      c => c.source === source && c.target === target
+    );
+    if (idx >= 0) {
+      animateRemoval(app, boxes, connections.splice(idx, 1)[0]!);
+    } else {
+      connections.push({ source, target });
+    }
+  }
 
   // Make each box interactive
   for (const box of boxes) {
@@ -92,13 +105,18 @@ export function setupConnections(
           // Same box — deselect
           selectedBoxIndex = null;
         } else {
-          // Different box — create connection from selected to tapped
-          connections.push({ source: selectedBoxIndex, target: tappedBox.index });
+          // Different box — toggle connection from selected to tapped
+          toggle(selectedBoxIndex, tappedBox.index);
           selectedBoxIndex = null;
           redraw();
         }
       } else {
-        // Tapped empty space — deselect
+        // Tapped empty space — check if tapped on a line
+        const lineIdx = hitTestLine(e.global.x, e.global.y, connections, boxes);
+        if (lineIdx >= 0) {
+          animateRemoval(app, boxes, connections.splice(lineIdx, 1)[0]!);
+          redraw();
+        }
         selectedBoxIndex = null;
       }
       drawHighlight();
@@ -106,7 +124,7 @@ export function setupConnections(
       // It's a drag — existing behavior
       const target = hitTest(e.global.x, e.global.y, boxes);
       if (target && target.index !== dragSource.index) {
-        connections.push({ source: dragSource.index, target: target.index });
+        toggle(dragSource.index, target.index);
         redraw();
       }
     }
@@ -171,51 +189,99 @@ export function setupConnections(
   return { connections, redraw };
 }
 
-function drawConnection(g: Graphics, source: BoxInfo, target: BoxInfo) {
+function getBezierParams(source: BoxInfo, target: BoxInfo) {
   const dx = target.cx - source.cx;
   const dy = target.cy - source.cy;
   const dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist < 1) return;
+  if (dist < 1) return null;
 
-  // Edge intersection points — line starts/ends at box boundaries
   const start = boxEdge(source, target.cx, target.cy);
   const end = boxEdge(target, source.cx, source.cy);
 
-  // Perpendicular offset for gentle bezier curve
   const perpX = -dy / dist;
   const perpY = dx / dist;
   const offset = dist * CURVE_OFFSET_RATIO;
 
   const midX = (source.cx + target.cx) / 2;
   const midY = (source.cy + target.cy) / 2;
-  const cpX = midX + perpX * offset;
-  const cpY = midY + perpY * offset;
 
-  // Draw curve
-  g.moveTo(start.x, start.y);
-  g.quadraticCurveTo(cpX, cpY, end.x, end.y);
-  g.stroke({ width: LINE_WIDTH, color: LINE_COLOR });
+  return {
+    start,
+    end,
+    cpX: midX + perpX * offset,
+    cpY: midY + perpY * offset,
+  };
+}
 
-  // Arrowhead — tangent at endpoint is direction from CP to endpoint
-  const tdx = end.x - cpX;
-  const tdy = end.y - cpY;
+function drawConnection(g: Graphics, source: BoxInfo, target: BoxInfo, color = LINE_COLOR) {
+  const bez = getBezierParams(source, target);
+  if (!bez) return;
+
+  g.moveTo(bez.start.x, bez.start.y);
+  g.quadraticCurveTo(bez.cpX, bez.cpY, bez.end.x, bez.end.y);
+  g.stroke({ width: LINE_WIDTH, color });
+
+  const tdx = bez.end.x - bez.cpX;
+  const tdy = bez.end.y - bez.cpY;
   const tLen = Math.sqrt(tdx * tdx + tdy * tdy);
   if (tLen < 1) return;
 
   const ux = tdx / tLen;
   const uy = tdy / tLen;
 
-  g.moveTo(end.x, end.y);
+  g.moveTo(bez.end.x, bez.end.y);
   g.lineTo(
-    end.x - ux * ARROW_SIZE + uy * ARROW_SIZE * 0.4,
-    end.y - uy * ARROW_SIZE - ux * ARROW_SIZE * 0.4,
+    bez.end.x - ux * ARROW_SIZE + uy * ARROW_SIZE * 0.4,
+    bez.end.y - uy * ARROW_SIZE - ux * ARROW_SIZE * 0.4,
   );
   g.lineTo(
-    end.x - ux * ARROW_SIZE - uy * ARROW_SIZE * 0.4,
-    end.y - uy * ARROW_SIZE + ux * ARROW_SIZE * 0.4,
+    bez.end.x - ux * ARROW_SIZE - uy * ARROW_SIZE * 0.4,
+    bez.end.y - uy * ARROW_SIZE + ux * ARROW_SIZE * 0.4,
   );
   g.closePath();
-  g.fill({ color: LINE_COLOR });
+  g.fill({ color });
+}
+
+function hitTestLine(
+  x: number,
+  y: number,
+  connections: Connection[],
+  boxes: BoxInfo[],
+): number {
+  for (let i = 0; i < connections.length; i++) {
+    const conn = connections[i]!;
+    const bez = getBezierParams(boxes[conn.source]!, boxes[conn.target]!);
+    if (!bez) continue;
+
+    for (let t = 0; t <= 1; t += 0.05) {
+      const mt = 1 - t;
+      const px = mt * mt * bez.start.x + 2 * mt * t * bez.cpX + t * t * bez.end.x;
+      const py = mt * mt * bez.start.y + 2 * mt * t * bez.cpY + t * t * bez.end.y;
+      if ((x - px) ** 2 + (y - py) ** 2 < LINE_HIT_THRESHOLD ** 2) return i;
+    }
+  }
+  return -1;
+}
+
+function animateRemoval(
+  app: Application,
+  boxes: BoxInfo[],
+  conn: Connection,
+) {
+  const layer = new Graphics();
+  app.stage.addChild(layer);
+  drawConnection(layer, boxes[conn.source]!, boxes[conn.target]!);
+  layer.alpha = 0.8;
+
+  const fade = () => {
+    layer.alpha -= FADE_SPEED;
+    if (layer.alpha <= 0) {
+      app.ticker.remove(fade);
+      app.stage.removeChild(layer);
+      layer.destroy();
+    }
+  };
+  app.ticker.add(fade);
 }
 
 /** Computes where a ray from the box center toward (toX, toY) exits the box boundary. */

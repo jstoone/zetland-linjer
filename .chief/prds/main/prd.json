@@ -73,7 +73,7 @@
         "The line disappears immediately with a brief visual feedback (e.g., fade out)"
       ],
       "priority": 5,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-006",

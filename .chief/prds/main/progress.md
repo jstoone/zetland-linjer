@@ -77,4 +77,22 @@
   - `highlightLayer` is inserted before `linesLayer` in stage children order so highlights appear behind lines
   - The green highlight uses the same color as the preview line (`SELECTED_COLOR = 0x53c28b`) for visual consistency
   - `BOX_RADIUS` (10) from grid.ts must be matched by `HIGHLIGHT_RADIUS` in connections.ts for the highlight overlay to align with box corners
+- `getBezierParams(source, target)` returns `{ start, end, cpX, cpY }` — reuse for any bezier curve operation (drawing, hit testing, animation)
+- For fade-out animations: create temp `Graphics` layer, decrement `layer.alpha` via `app.ticker`, `destroy()` when alpha ≤ 0
+---
+
+## 2026-03-02 - US-005
+- Implemented connection removal via three methods: toggle (same connection again), tap on line, and both drag/tap-tap paths
+- Extracted `getBezierParams` helper from `drawConnection` for reuse in hit testing and removal animation
+- Added `hitTestLine` that samples 20 points along each bezier curve and checks distance to tap point (threshold: 20px)
+- Added `animateRemoval` that draws the removed line on a temporary Graphics layer and fades it out over ~300ms using `app.ticker`
+- Added `toggle` closure inside `setupConnections` that checks for existing connection before adding/removing
+- Refactored `drawConnection` to accept an optional `color` parameter for future use (e.g., heatmap/aggregate styling)
+- Files changed: `src/connections.ts`
+- **Learnings for future iterations:**
+  - `getBezierParams` returns the start/end edge points and control point — reuse for any bezier-related feature (hit testing, styling, labels)
+  - PIXI v8 `Ticker.add(fn)` / `Ticker.remove(fn)` works with plain function references; no special signature required
+  - For fade animations: create a temporary `Graphics`, set `layer.alpha`, decrement in ticker, then `destroy()` when done
+  - Line hit testing via bezier sampling: 20 samples (t += 0.05) with a 20px threshold works well for touch targets on mobile
+  - Squared distance comparison `(dx**2 + dy**2 < threshold**2)` avoids unnecessary `Math.sqrt` calls in hot loops
 ---
