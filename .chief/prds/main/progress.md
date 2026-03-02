@@ -14,6 +14,8 @@
 - `Connection` interface: `{ source: number; target: number }` (0-based box indices)
 - Lines use quadratic bezier curves with perpendicular offset, arrowheads at target box edge
 - `touch-action: none` on canvas element prevents browser gestures from interfering with drag
+- Tap vs drag detection: compare pointer movement distance against `TAP_THRESHOLD` (10px) in `endDrag`
+- `selectedBoxIndex` state in `setupConnections` tracks tap-tap selection; `highlightLayer` renders the visual highlight
 
 ---
 
@@ -60,4 +62,19 @@
   - For bezier arrowheads: tangent at t=1 of quadratic bezier P0,CP,P2 is direction `P2 - CP`
   - Box edge intersection: compare `|dx|/halfW` vs `|dy|/halfH` to determine which edge is hit
   - `FederatedPointerEvent.global` gives coordinates in stage space (matches CSS coords with autoDensity)
+---
+
+## 2026-03-02 - US-004
+- Added tap-tap fallback for creating connections (tap one box, then tap another)
+- Distinguishes taps from drags by measuring pointer movement distance (< 10px = tap)
+- Selected box gets a green highlight overlay (rounded rect with fill alpha 0.15 and stroke alpha 0.8)
+- Tapping the same box twice deselects it; tapping empty space also deselects
+- Both drag and tap-tap work simultaneously — drag takes precedence when movement exceeds threshold
+- Added `highlightLayer` Graphics between boxes and linesLayer for proper z-ordering
+- Files changed: `src/connections.ts`
+- **Learnings for future iterations:**
+  - Tap vs drag: track `dragStartX`/`dragStartY` on pointerdown, compare distance on pointerup
+  - `highlightLayer` is inserted before `linesLayer` in stage children order so highlights appear behind lines
+  - The green highlight uses the same color as the preview line (`SELECTED_COLOR = 0x53c28b`) for visual consistency
+  - `BOX_RADIUS` (10) from grid.ts must be matched by `HIGHLIGHT_RADIUS` in connections.ts for the highlight overlay to align with box corners
 ---
