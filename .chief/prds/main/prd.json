@@ -144,7 +144,7 @@
         "The user can press the button again to refresh/update the results (results trickle in as more people submit)"
       ],
       "priority": 10,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-011",

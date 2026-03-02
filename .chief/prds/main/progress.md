@@ -24,6 +24,9 @@
 - Connections saved to `localStorage` key `linjer_connections` as JSON after submission
 - `getStoredConnections()` in `submit.ts` retrieves saved connections from localStorage (returns `Connection[]` 0-based)
 - Results button (`#results-btn`) shares position with submit button — they're mutually exclusive in visibility
+- Supabase RPC functions: `supabase.rpc('fn_name')` returns `{ data, error }` — use `SECURITY DEFINER` for anonymous access
+- `drawConnection(g, source, target, color, width)` is exported from connections.ts — reusable for any line rendering
+- Results rendering lives in `src/results.ts` — `createResultsRenderer(app, boxes)` returns `{ showResults, hide, visible }`
 
 ---
 
@@ -152,4 +155,21 @@
   - The `#results-btn` is positioned at `bottom: 24px; right: 24px` — same position as submit button (they're never both visible)
   - Restoring state on load: push stored connections into `manager.connections` then call `manager.redraw()` — the connections array is shared by reference
   - The results button is a placeholder for US-010 (aggregate results) — its click handler will be wired up in that story
+---
+
+## 2026-03-02 - US-010
+- Created Supabase RPC function `get_aggregate_connections()` that returns grouped connection counts (source_box, target_box, count) ordered by count DESC
+- Exported `drawConnection` from `connections.ts` with configurable width parameter for reuse in aggregate rendering
+- Created `src/results.ts` with `createResultsRenderer(app, boxes)` — manages two PIXI Graphics layers (aggregate + user highlights)
+- Aggregate lines rendered with variable thickness proportional to count (MIN_WIDTH=1.5 to MAX_WIDTH=10), color `0x8899bb` at 0.7 alpha
+- User's own connections highlighted on top in distinct red (`0xe94560`) at width 3 so they stand out
+- Results button changes to "Opdater resultater" after first fetch, allowing refresh to see new submissions
+- Loading state ("Henter...") and error handling with toast for failed fetches
+- Files changed: `src/connections.ts`, `src/main.ts`, `src/results.ts` (new)
+- **Learnings for future iterations:**
+  - Supabase RPC functions created via `CREATE FUNCTION ... RETURNS TABLE` + `SECURITY DEFINER` work with anonymous access
+  - Call RPC via `supabase.rpc('function_name')` — returns `{ data, error }` like regular queries
+  - `drawConnection` now accepts `width` parameter — callers can control line thickness for aggregate vs user lines
+  - PIXI `addChildAt(child, index)` inserts at specific z-order — use `boxes.length` as insert index to place layers above boxes but below interaction layers
+  - Aggregate layer at `alpha=0.7` provides good visual separation from user's own highlighted connections
 ---
