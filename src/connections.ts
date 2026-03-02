@@ -222,13 +222,13 @@ function getBezierParams(source: BoxInfo, target: BoxInfo) {
   };
 }
 
-function drawConnection(g: Graphics, source: BoxInfo, target: BoxInfo, color = LINE_COLOR) {
+export function drawConnection(g: Graphics, source: BoxInfo, target: BoxInfo, color = LINE_COLOR, width = LINE_WIDTH) {
   const bez = getBezierParams(source, target);
   if (!bez) return;
 
   g.moveTo(bez.start.x, bez.start.y);
   g.quadraticCurveTo(bez.cpX, bez.cpY, bez.end.x, bez.end.y);
-  g.stroke({ width: LINE_WIDTH, color });
+  g.stroke({ width, color });
 
   const tdx = bez.end.x - bez.cpX;
   const tdy = bez.end.y - bez.cpY;

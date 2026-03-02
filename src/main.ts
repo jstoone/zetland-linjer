@@ -2,6 +2,7 @@ import { Application } from "pixi.js";
 import { createGrid } from "./grid";
 import { Connection, setupConnections } from "./connections";
 import { isSubmitted, getStoredConnections, submitConnections } from "./submit";
+import { createResultsRenderer } from "./results";
 
 const app = new Application();
 
@@ -17,6 +18,7 @@ document.body.appendChild(app.canvas);
 
 const boxes = createGrid(app);
 const manager = setupConnections(app, boxes);
+const results = createResultsRenderer(app, boxes);
 
 // --- UI elements ---
 const resetBtn = document.getElementById("reset-btn") as HTMLButtonElement;
@@ -99,7 +101,7 @@ submitBtn.addEventListener("click", async () => {
     submitBtn.style.display = "none";
     resetBtn.style.display = "none";
     resultsBtn.style.display = "";
-  } catch (err) {
+  } catch {
     submitBtn.disabled = false;
     submitBtn.textContent = "Send";
     submitError.textContent = "Noget gik galt — prøv igen";
@@ -107,5 +109,25 @@ submitBtn.addEventListener("click", async () => {
     setTimeout(() => {
       submitError.style.display = "none";
     }, 4000);
+  }
+});
+
+// --- Results button ---
+resultsBtn.addEventListener("click", async () => {
+  resultsBtn.disabled = true;
+  resultsBtn.textContent = "Henter...";
+
+  try {
+    await results.showResults(manager.connections);
+    resultsBtn.textContent = "Opdater resultater";
+  } catch {
+    resultsBtn.textContent = "Se resultater";
+    submitError.textContent = "Kunne ikke hente resultater";
+    submitError.style.display = "";
+    setTimeout(() => {
+      submitError.style.display = "none";
+    }, 4000);
+  } finally {
+    resultsBtn.disabled = false;
   }
 });
