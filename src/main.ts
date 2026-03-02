@@ -1,6 +1,7 @@
 import { Application } from "pixi.js";
 import { createGrid } from "./grid";
 import { Connection, setupConnections } from "./connections";
+import { isSubmitted, submitConnections } from "./submit";
 
 const app = new Application();
 
@@ -17,32 +18,43 @@ document.body.appendChild(app.canvas);
 const boxes = createGrid(app);
 const manager = setupConnections(app, boxes);
 
-// --- Reset button + undo toast ---
+// --- UI elements ---
 const resetBtn = document.getElementById("reset-btn") as HTMLButtonElement;
 const undoToast = document.getElementById("undo-toast") as HTMLDivElement;
+const submitBtn = document.getElementById("submit-btn") as HTMLButtonElement;
+const submitError = document.getElementById("submit-error") as HTMLDivElement;
 
+let submitted = isSubmitted();
 let undoBackup: Connection[] | null = null;
 let undoTimer: ReturnType<typeof setTimeout> | null = null;
 
-function updateResetVisibility() {
-  resetBtn.style.display = manager.connections.length > 0 ? "" : "none";
+function updateButtonVisibility() {
+  if (submitted) {
+    resetBtn.style.display = "none";
+    submitBtn.style.display = "none";
+    return;
+  }
+  const hasConnections = manager.connections.length > 0;
+  resetBtn.style.display = hasConnections ? "" : "none";
+  submitBtn.style.display = hasConnections ? "" : "none";
 }
 
 // Poll visibility cheaply via animation frame (connections change from pointer events)
 function tick() {
-  updateResetVisibility();
+  updateButtonVisibility();
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
 
+// --- Reset button + undo toast ---
 resetBtn.addEventListener("click", () => {
   const removed = manager.resetAll();
   if (removed.length === 0) return;
 
-  // Show undo toast
   undoBackup = removed;
   undoToast.style.display = "";
   resetBtn.style.display = "none";
+  submitBtn.style.display = "none";
 
   if (undoTimer) clearTimeout(undoTimer);
   undoTimer = setTimeout(() => {
@@ -61,5 +73,29 @@ undoToast.addEventListener("click", () => {
   if (undoTimer) {
     clearTimeout(undoTimer);
     undoTimer = null;
+  }
+});
+
+// --- Submit button ---
+submitBtn.addEventListener("click", async () => {
+  if (submitted || manager.connections.length === 0) return;
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Sender...";
+  submitError.style.display = "none";
+
+  try {
+    await submitConnections(manager.connections);
+    submitted = true;
+    submitBtn.style.display = "none";
+    resetBtn.style.display = "none";
+  } catch (err) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Send";
+    submitError.textContent = "Noget gik galt — prøv igen";
+    submitError.style.display = "";
+    setTimeout(() => {
+      submitError.style.display = "none";
+    }, 4000);
   }
 });

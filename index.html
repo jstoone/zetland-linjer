@@ -43,11 +43,49 @@
         display: none;
         -webkit-tap-highlight-color: transparent;
       }
+      #submit-btn {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        padding: 12px 32px;
+        font-size: 16px;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-weight: 700;
+        color: #fff;
+        background: rgba(83, 194, 139, 0.9);
+        border: none;
+        border-radius: 24px;
+        cursor: pointer;
+        z-index: 10;
+        -webkit-tap-highlight-color: transparent;
+        display: none;
+      }
+      #submit-btn:active { background: rgba(63, 164, 109, 0.95); }
+      #submit-btn:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      #submit-error {
+        position: fixed;
+        bottom: 80px;
+        right: 24px;
+        padding: 10px 20px;
+        font-size: 13px;
+        font-family: system-ui, -apple-system, sans-serif;
+        color: #fff;
+        background: rgba(233, 69, 96, 0.9);
+        border-radius: 16px;
+        z-index: 10;
+        display: none;
+        -webkit-tap-highlight-color: transparent;
+      }
     </style>
   </head>
   <body>
     <button id="reset-btn">Nulstil</button>
     <div id="undo-toast">Fortryd</div>
+    <button id="submit-btn">Send</button>
+    <div id="submit-error"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

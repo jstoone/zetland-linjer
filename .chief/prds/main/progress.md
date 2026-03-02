@@ -16,6 +16,12 @@
 - `touch-action: none` on canvas element prevents browser gestures from interfering with drag
 - Tap vs drag detection: compare pointer movement distance against `TAP_THRESHOLD` (10px) in `endDrag`
 - `selectedBoxIndex` state in `setupConnections` tracks tap-tap selection; `highlightLayer` renders the visual highlight
+- Supabase client lives in `src/supabase.ts` — exports `supabase` singleton
+- Submit logic lives in `src/submit.ts` — exports `isSubmitted()` and `submitConnections(connections)`
+- Box indices are 0-based internally but stored as 1-based in Supabase (source_box + 1, target_box + 1)
+- Session ID generated via `crypto.randomUUID()` and stored in `localStorage` key `linjer_session_id`
+- Submission state tracked via `localStorage` key `linjer_submitted` ("true" when submitted)
+- Connections saved to `localStorage` key `linjer_connections` as JSON after submission
 
 ---
 
@@ -111,4 +117,24 @@
   - Using `requestAnimationFrame` to poll `connections.length` for button visibility is simple and avoids needing custom events
   - Fixed-position buttons with `bottom: 24px` + `left: 50%; transform: translateX(-50%)` center well on mobile
   - The `#undo-toast` sits at `bottom: 80px` to stay above the reset button without overlap
+---
+
+## 2026-03-02 - US-007 + US-009
+- Created Supabase `connections` table with columns: id (uuid PK), session_id (text), source_box (smallint), target_box (smallint), created_at (timestamptz)
+- RLS enabled with policies for anonymous inserts and selects
+- Installed `@supabase/supabase-js` SDK
+- Created `src/supabase.ts` with Supabase client singleton (project URL + anon key)
+- Created `src/submit.ts` with session ID generation, submission logic, and localStorage state management
+- Added "Send" submit button (green, fixed bottom-right) — visible when connections exist, hidden after submission
+- Added error toast ("Noget gik galt — prøv igen") for failed submissions with 4-second auto-dismiss
+- Button shows "Sender..." while submitting and is disabled during request
+- After successful submission: button hidden, reset button hidden, connections + session_id saved to localStorage
+- Updated `main.ts` to wire up submit button, manage submitted state, and hide reset/submit after submission
+- Files changed: `src/supabase.ts` (new), `src/submit.ts` (new), `src/main.ts`, `index.html`, `package.json`
+- **Learnings for future iterations:**
+  - Supabase anon key is safe to embed client-side — RLS policies control access, not the key
+  - `submitConnections()` converts 0-based box indices to 1-based before inserting (source + 1, target + 1)
+  - The submit button sits at `right: 24px` to avoid overlapping the centered reset button
+  - Error toast at `bottom: 80px; right: 24px` to position above the submit button
+  - `isSubmitted()` checks localStorage on page load — used by main.ts to skip showing submit/reset buttons
 ---

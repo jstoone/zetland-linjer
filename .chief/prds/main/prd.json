@@ -102,7 +102,7 @@
         "Once submitted, the user cannot modify or resubmit — localStorage tracks the \"submitted\" state"
       ],
       "priority": 7,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-008",
@@ -129,7 +129,7 @@
         "The Supabase project URL is https://msjzqyhdfohxrhdovjxq.supabase.co"
       ],
       "priority": 9,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-010",
