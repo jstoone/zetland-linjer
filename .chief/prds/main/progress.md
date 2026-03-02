@@ -79,6 +79,8 @@
   - `BOX_RADIUS` (10) from grid.ts must be matched by `HIGHLIGHT_RADIUS` in connections.ts for the highlight overlay to align with box corners
 - `getBezierParams(source, target)` returns `{ start, end, cpX, cpY }` — reuse for any bezier curve operation (drawing, hit testing, animation)
 - For fade-out animations: create temp `Graphics` layer, decrement `layer.alpha` via `app.ticker`, `destroy()` when alpha ≤ 0
+- HTML overlay elements (fixed-position buttons/toasts) work well for UI controls on top of the PIXI canvas
+- `ConnectionManager` returned from `setupConnections()` has `connections`, `redraw()`, and `resetAll()`
 ---
 
 ## 2026-03-02 - US-005
@@ -95,4 +97,18 @@
   - For fade animations: create a temporary `Graphics`, set `layer.alpha`, decrement in ticker, then `destroy()` when done
   - Line hit testing via bezier sampling: 20 samples (t += 0.05) with a 20px threshold works well for touch targets on mobile
   - Squared distance comparison `(dx**2 + dy**2 < threshold**2)` avoids unnecessary `Math.sqrt` calls in hot loops
+---
+
+## 2026-03-02 - US-006
+- Added "Nulstil" (Reset) button fixed at bottom-center of screen, only visible when connections exist
+- Added 3-second "Fortryd" (Undo) toast that appears after reset — tapping it restores all removed connections
+- Extended `ConnectionManager` with `resetAll()` method that clears connections array, deselects, and redraws
+- Button and toast are HTML elements overlaid on the canvas (not PIXI objects) for better touch handling and styling
+- Files changed: `src/connections.ts`, `src/main.ts`, `index.html`
+- **Learnings for future iterations:**
+  - HTML overlay buttons work well for UI controls on top of PIXI canvas — easier to style and more accessible than PIXI-based UI
+  - `resetAll()` returns the removed connections array so callers can implement undo
+  - Using `requestAnimationFrame` to poll `connections.length` for button visibility is simple and avoids needing custom events
+  - Fixed-position buttons with `bottom: 24px` + `left: 50%; transform: translateX(-50%)` center well on mobile
+  - The `#undo-toast` sits at `bottom: 80px` to stay above the reset button without overlap
 ---

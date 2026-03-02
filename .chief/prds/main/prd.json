@@ -85,7 +85,7 @@
         "A brief confirmation or undo option is shown to prevent accidental resets (can be as simple as a 3-second \"Undo\" toast)"
       ],
       "priority": 6,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-007",
