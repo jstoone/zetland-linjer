@@ -1,5 +1,6 @@
 import { Application } from "pixi.js";
 import { createGrid } from "./grid";
+import { setupConnections } from "./connections";
 
 const app = new Application();
 
@@ -13,4 +14,5 @@ await app.init({
 
 document.body.appendChild(app.canvas);
 
-createGrid(app);
+const boxes = createGrid(app);
+setupConnections(app, boxes);

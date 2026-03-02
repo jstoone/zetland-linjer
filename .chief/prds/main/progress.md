@@ -9,6 +9,11 @@
 - Box labels live in `src/config.ts` as a `BOX_LABELS` string array (0-based index, box 1 = index 0)
 - Grid rendering lives in `src/grid.ts`, exports `createGrid(app)` → returns `BoxInfo[]`
 - `BoxInfo` has `index`, `container`, `cx`, `cy`, `w`, `h` — needed for line drawing in future stories
+- Connection logic lives in `src/connections.ts`, exports `setupConnections(app, boxes)` → returns `ConnectionManager`
+- `ConnectionManager` has `connections: Connection[]` (mutable array) and `redraw()` to re-render all lines
+- `Connection` interface: `{ source: number; target: number }` (0-based box indices)
+- Lines use quadratic bezier curves with perpendicular offset, arrowheads at target box edge
+- `touch-action: none` on canvas element prevents browser gestures from interfering with drag
 
 ---
 
@@ -38,4 +43,21 @@
   - The grid ROWS constant maps visual rows (top-to-bottom) to box indices — bottom row has 2 boxes, rest have 3
   - `BoxInfo` interface is exported for future stories (line drawing will need `cx`, `cy` for connection endpoints)
   - Text `wordWrapWidth` should be box width minus padding to keep text readable
+---
+
+## 2026-03-02 - US-003
+- Implemented drag-to-connect interaction between boxes
+- Created `src/connections.ts` with full pointer event handling (pointerdown on boxes, pointermove/pointerup on stage)
+- Preview line (green, semi-transparent) follows finger during drag, disappears if drag ends outside a box
+- Committed connections rendered as bezier curves (quadratic, with perpendicular offset) with arrowheads
+- Lines start/end at box edges using ray-box intersection calculation
+- Added `touch-action: none` to canvas CSS in `index.html` for reliable mobile touch handling
+- Files changed: `src/connections.ts` (new), `src/main.ts`, `index.html`
+- **Learnings for future iterations:**
+  - PIXI v8 pointer events: set `eventMode = 'static'` and `hitArea` on containers for interaction
+  - Use `app.stage.hitArea = app.screen` to capture stage-level pointer events
+  - `pointercancel` event should be handled on mobile (browser can steal touch for gestures)
+  - For bezier arrowheads: tangent at t=1 of quadratic bezier P0,CP,P2 is direction `P2 - CP`
+  - Box edge intersection: compare `|dx|/halfW` vs `|dy|/halfH` to determine which edge is hit
+  - `FederatedPointerEvent.global` gives coordinates in stage space (matches CSS coords with autoDensity)
 ---
