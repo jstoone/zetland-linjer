@@ -22,6 +22,8 @@
 - Session ID generated via `crypto.randomUUID()` and stored in `localStorage` key `linjer_session_id`
 - Submission state tracked via `localStorage` key `linjer_submitted` ("true" when submitted)
 - Connections saved to `localStorage` key `linjer_connections` as JSON after submission
+- `getStoredConnections()` in `submit.ts` retrieves saved connections from localStorage (returns `Connection[]` 0-based)
+- Results button (`#results-btn`) shares position with submit button — they're mutually exclusive in visibility
 
 ---
 
@@ -137,4 +139,17 @@
   - The submit button sits at `right: 24px` to avoid overlapping the centered reset button
   - Error toast at `bottom: 80px; right: 24px` to position above the submit button
   - `isSubmitted()` checks localStorage on page load — used by main.ts to skip showing submit/reset buttons
+---
+
+## 2026-03-02 - US-008
+- Added `getStoredConnections()` to `submit.ts` — retrieves saved connections from localStorage with JSON parse error handling
+- On page load, if `isSubmitted()` is true, connections are restored from localStorage, pushed into `manager.connections`, and `redraw()` renders them on canvas
+- Added "Se resultater" button (`#results-btn`) in HTML — shown after submission (both fresh and restored from localStorage)
+- After fresh submission, the results button is now displayed alongside hiding submit/reset buttons
+- Files changed: `src/submit.ts`, `src/main.ts`, `index.html`
+- **Learnings for future iterations:**
+  - `getStoredConnections()` parses `linjer_connections` from localStorage — returns `Connection[]` (0-based indices, same as internal format)
+  - The `#results-btn` is positioned at `bottom: 24px; right: 24px` — same position as submit button (they're never both visible)
+  - Restoring state on load: push stored connections into `manager.connections` then call `manager.redraw()` — the connections array is shared by reference
+  - The results button is a placeholder for US-010 (aggregate results) — its click handler will be wired up in that story
 ---
