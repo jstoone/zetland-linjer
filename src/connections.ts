@@ -13,10 +13,13 @@ export interface Connection {
 
 const LINE_COLOR = 0xe94560;
 const PREVIEW_COLOR = 0x53c28b;
+const SELECTED_COLOR = 0x53c28b;
 const LINE_WIDTH = 2.5;
 const PREVIEW_WIDTH = 2;
 const ARROW_SIZE = 8;
 const CURVE_OFFSET_RATIO = 0.15;
+const TAP_THRESHOLD = 10;
+const HIGHLIGHT_RADIUS = 10;
 
 export interface ConnectionManager {
   connections: Connection[];
@@ -32,14 +35,19 @@ export function setupConnections(
   boxes: BoxInfo[],
 ): ConnectionManager {
   const connections: Connection[] = [];
+  const highlightLayer = new Graphics();
   const linesLayer = new Graphics();
   const previewLayer = new Graphics();
+  app.stage.addChild(highlightLayer);
   app.stage.addChild(linesLayer);
   app.stage.addChild(previewLayer);
 
   let dragSource: BoxInfo | null = null;
   let pointerX = 0;
   let pointerY = 0;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let selectedBoxIndex: number | null = null;
 
   // Make each box interactive
   for (const box of boxes) {
@@ -48,6 +56,8 @@ export function setupConnections(
     box.container.hitArea = new Rectangle(0, 0, box.w, box.h);
     box.container.on("pointerdown", (e: FederatedPointerEvent) => {
       dragSource = box;
+      dragStartX = e.global.x;
+      dragStartY = e.global.y;
       pointerX = e.global.x;
       pointerY = e.global.y;
     });
@@ -66,11 +76,41 @@ export function setupConnections(
 
   const endDrag = (e: FederatedPointerEvent) => {
     if (!dragSource) return;
-    const target = hitTest(e.global.x, e.global.y, boxes);
-    if (target && target.index !== dragSource.index) {
-      connections.push({ source: dragSource.index, target: target.index });
-      redraw();
+
+    const dx = e.global.x - dragStartX;
+    const dy = e.global.y - dragStartY;
+    const movedDist = Math.sqrt(dx * dx + dy * dy);
+
+    if (movedDist < TAP_THRESHOLD) {
+      // It's a tap — handle tap-tap selection
+      const tappedBox = hitTest(e.global.x, e.global.y, boxes);
+      if (tappedBox) {
+        if (selectedBoxIndex === null) {
+          // No selection — select this box
+          selectedBoxIndex = tappedBox.index;
+        } else if (selectedBoxIndex === tappedBox.index) {
+          // Same box — deselect
+          selectedBoxIndex = null;
+        } else {
+          // Different box — create connection from selected to tapped
+          connections.push({ source: selectedBoxIndex, target: tappedBox.index });
+          selectedBoxIndex = null;
+          redraw();
+        }
+      } else {
+        // Tapped empty space — deselect
+        selectedBoxIndex = null;
+      }
+      drawHighlight();
+    } else {
+      // It's a drag — existing behavior
+      const target = hitTest(e.global.x, e.global.y, boxes);
+      if (target && target.index !== dragSource.index) {
+        connections.push({ source: dragSource.index, target: target.index });
+        redraw();
+      }
     }
+
     dragSource = null;
     previewLayer.clear();
   };
@@ -106,6 +146,17 @@ export function setupConnections(
       color: PREVIEW_COLOR,
       alpha: 0.6,
     });
+  }
+
+  function drawHighlight() {
+    highlightLayer.clear();
+    if (selectedBoxIndex === null) return;
+    const b = boxes[selectedBoxIndex]!;
+    const left = b.cx - b.w / 2;
+    const top = b.cy - b.h / 2;
+    highlightLayer.roundRect(left, top, b.w, b.h, HIGHLIGHT_RADIUS);
+    highlightLayer.fill({ color: SELECTED_COLOR, alpha: 0.15 });
+    highlightLayer.stroke({ width: 2, color: SELECTED_COLOR, alpha: 0.8 });
   }
 
   function redraw() {
