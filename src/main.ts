@@ -1,4 +1,5 @@
 import { Application } from "pixi.js";
+import { THEME } from "./config";
 import { createGrid } from "./grid";
 import { Connection, setupConnections } from "./connections";
 import { isSubmitted, getStoredConnections, submitConnections } from "./submit";
@@ -7,7 +8,7 @@ import { createResultsRenderer } from "./results";
 const app = new Application();
 
 await app.init({
-  background: "#1a1a2e",
+  background: THEME.bgCss,
   resizeTo: window,
   antialias: true,
   resolution: window.devicePixelRatio || 1,

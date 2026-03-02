@@ -1,5 +1,5 @@
 import { Application, Container, Graphics, Text, TextStyle } from "pixi.js";
-import { BOX_LABELS } from "./config";
+import { BOX_LABELS, THEME } from "./config";
 
 /** Visual layout: rows from top (Tier 4) to bottom (Tier 1). Values are box indices (0-based). */
 const ROWS: number[][] = [
@@ -14,9 +14,8 @@ const PADDING_TOP = 24;
 const GAP = 12;
 const BOX_RADIUS = 10;
 const BOX_BORDER = 1.5;
-const BOX_COLOR = 0x16213e;
-const BOX_BORDER_COLOR = 0x0f3460;
-const TEXT_COLOR = "#e2e2e2";
+const GLOW_SPREAD = 6;
+const GLOW_ALPHA = 0.18;
 
 export interface BoxInfo {
   /** 0-based index into BOX_LABELS */
@@ -59,7 +58,7 @@ export function createGrid(app: Application): BoxInfo[] {
   const textStyle = new TextStyle({
     fontFamily: "system-ui, -apple-system, sans-serif",
     fontSize: 14,
-    fill: TEXT_COLOR,
+    fill: THEME.text,
     align: "center",
     wordWrap: true,
     wordWrapWidth: boxW - 16,
@@ -85,11 +84,23 @@ export function createGrid(app: Application): BoxInfo[] {
       const container = new Container();
       container.position.set(x, y);
 
+      // Subtle glow behind box
+      const glow = new Graphics();
+      glow.roundRect(
+        -GLOW_SPREAD,
+        -GLOW_SPREAD,
+        boxW + GLOW_SPREAD * 2,
+        clampedH + GLOW_SPREAD * 2,
+        BOX_RADIUS + GLOW_SPREAD,
+      );
+      glow.fill({ color: THEME.boxGlow, alpha: GLOW_ALPHA });
+      container.addChild(glow);
+
       // Background
       const bg = new Graphics();
       bg.roundRect(0, 0, boxW, clampedH, BOX_RADIUS);
-      bg.fill(BOX_COLOR);
-      bg.stroke({ width: BOX_BORDER, color: BOX_BORDER_COLOR });
+      bg.fill(THEME.boxFill);
+      bg.stroke({ width: BOX_BORDER, color: THEME.boxBorder });
       container.addChild(bg);
 
       // Label

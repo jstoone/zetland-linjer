@@ -27,6 +27,9 @@
 - Supabase RPC functions: `supabase.rpc('fn_name')` returns `{ data, error }` — use `SECURITY DEFINER` for anonymous access
 - `drawConnection(g, source, target, color, width)` is exported from connections.ts — reusable for any line rendering
 - Results rendering lives in `src/results.ts` — `createResultsRenderer(app, boxes)` returns `{ showResults, hide, visible }`
+- All colors centralized in `THEME` object in `src/config.ts` — change palette by editing one file
+- CSS uses custom properties (`:root` vars) aligned with JS theme — e.g. `var(--bg)`, `var(--accent)`
+- When using `as const` on theme objects, add explicit `: number` type annotations to function params that accept theme color values to avoid literal type mismatch
 
 ---
 
@@ -172,4 +175,20 @@
   - `drawConnection` now accepts `width` parameter — callers can control line thickness for aggregate vs user lines
   - PIXI `addChildAt(child, index)` inserts at specific z-order — use `boxes.length` as insert index to place layers above boxes but below interaction layers
   - Aggregate layer at `alpha=0.7` provides good visual separation from user's own highlighted connections
+---
+
+## 2026-03-02 - US-011
+- Centralized all colors into a `THEME` object in `src/config.ts` — single place to change the entire color palette
+- Added CSS custom properties (`:root` vars) in `index.html` aligned with the JS theme constants
+- Added shared `.btn` CSS class with transition effects for all buttons (smoother hover/active states)
+- Added subtle glow effect behind each box (semi-transparent rounded rect slightly larger than the box)
+- Replaced all hardcoded color values in `grid.ts`, `connections.ts`, `results.ts`, and `main.ts` with `THEME.*` references
+- Changed HTML `body` background from `#0a0a0a` to `var(--bg)` so it matches the canvas seamlessly
+- Files changed: `src/config.ts`, `src/grid.ts`, `src/connections.ts`, `src/results.ts`, `src/main.ts`, `index.html`
+- **Learnings for future iterations:**
+  - `as const` on a theme object makes all values literal types — functions accepting theme colors need explicit `: number` type annotations to avoid `Argument of type 'X' is not assignable to parameter of type 'Y'` errors
+  - CSS custom properties (`:root` vars) can't import from JS, but keeping values aligned manually is a good compromise for a short-lived project
+  - A `GLOW_SPREAD` of 6px with 0.18 alpha provides a subtle, non-distracting glow behind boxes
+  - Adding `transition: background 0.15s ease` to buttons gives a more polished feel on touch interactions
+  - The `.btn` shared class pattern reduces CSS duplication across multiple button styles
 ---

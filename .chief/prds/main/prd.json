@@ -159,7 +159,7 @@
         "The app works in both light and dark environments (theater lighting may be dim)"
       ],
       "priority": 11,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-012",

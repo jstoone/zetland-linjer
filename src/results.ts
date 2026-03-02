@@ -2,6 +2,7 @@ import { Application, Graphics } from "pixi.js";
 import { supabase } from "./supabase";
 import { BoxInfo } from "./grid";
 import { Connection, drawConnection } from "./connections";
+import { THEME } from "./config";
 
 interface AggregateRow {
   source_box: number;
@@ -9,8 +10,8 @@ interface AggregateRow {
   count: number;
 }
 
-const AGGREGATE_COLOR = 0x8899bb;
-const USER_COLOR = 0xe94560;
+const AGGREGATE_COLOR = THEME.aggregate;
+const USER_COLOR = THEME.userHighlight;
 const MIN_WIDTH = 1.5;
 const MAX_WIDTH = 10;
 

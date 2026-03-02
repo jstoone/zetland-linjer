@@ -5,15 +5,16 @@ import {
   Rectangle,
 } from "pixi.js";
 import { BoxInfo } from "./grid";
+import { THEME } from "./config";
 
 export interface Connection {
   source: number;
   target: number;
 }
 
-const LINE_COLOR = 0xe94560;
-const PREVIEW_COLOR = 0x53c28b;
-const SELECTED_COLOR = 0x53c28b;
+const LINE_COLOR = THEME.line;
+const PREVIEW_COLOR = THEME.preview;
+const SELECTED_COLOR = THEME.selected;
 const LINE_WIDTH = 2.5;
 const PREVIEW_WIDTH = 2;
 const ARROW_SIZE = 8;
@@ -222,7 +223,7 @@ function getBezierParams(source: BoxInfo, target: BoxInfo) {
   };
 }
 
-export function drawConnection(g: Graphics, source: BoxInfo, target: BoxInfo, color = LINE_COLOR, width = LINE_WIDTH) {
+export function drawConnection(g: Graphics, source: BoxInfo, target: BoxInfo, color: number = LINE_COLOR, width: number = LINE_WIDTH) {
   const bez = getBezierParams(source, target);
   if (!bez) return;
 

@@ -5,28 +5,50 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Linjer</title>
     <style>
+      :root {
+        --bg: #1a1a2e;
+        --text: #e2e2e2;
+        --text-white: #fff;
+        --surface: rgba(22, 33, 62, 0.85);
+        --surface-active: rgba(15, 52, 96, 0.95);
+        --surface-border: #0f3460;
+        --accent: rgba(83, 194, 139, 0.9);
+        --accent-active: rgba(63, 164, 109, 0.95);
+        --error: rgba(233, 69, 96, 0.9);
+        --font: system-ui, -apple-system, sans-serif;
+        --radius: 24px;
+      }
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0a0a; }
+      html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); }
       canvas { display: block; touch-action: none; }
-      #reset-btn {
+
+      /* Shared button base */
+      .btn {
         position: fixed;
+        font-family: var(--font);
+        font-weight: 600;
+        border: none;
+        border-radius: var(--radius);
+        cursor: pointer;
+        z-index: 10;
+        -webkit-tap-highlight-color: transparent;
+        display: none;
+        transition: background 0.15s ease, opacity 0.15s ease;
+      }
+      .btn:disabled { opacity: 0.5; cursor: default; }
+
+      #reset-btn {
         bottom: 24px;
         left: 50%;
         transform: translateX(-50%);
         padding: 10px 28px;
         font-size: 15px;
-        font-family: system-ui, -apple-system, sans-serif;
-        font-weight: 600;
-        color: #e2e2e2;
-        background: rgba(22, 33, 62, 0.85);
-        border: 1.5px solid #0f3460;
-        border-radius: 24px;
-        cursor: pointer;
-        z-index: 10;
-        -webkit-tap-highlight-color: transparent;
-        display: none;
+        color: var(--text);
+        background: var(--surface);
+        border: 1.5px solid var(--surface-border);
       }
-      #reset-btn:active { background: rgba(15, 52, 96, 0.95); }
+      #reset-btn:active { background: var(--surface-active); }
+
       #undo-toast {
         position: fixed;
         bottom: 80px;
@@ -34,76 +56,61 @@
         transform: translateX(-50%);
         padding: 10px 24px;
         font-size: 14px;
-        font-family: system-ui, -apple-system, sans-serif;
-        color: #e2e2e2;
-        background: rgba(83, 194, 139, 0.9);
+        font-family: var(--font);
+        color: var(--text);
+        background: var(--accent);
         border-radius: 20px;
         cursor: pointer;
         z-index: 10;
         display: none;
         -webkit-tap-highlight-color: transparent;
+        transition: opacity 0.15s ease;
       }
+
       #submit-btn {
-        position: fixed;
         bottom: 24px;
         right: 24px;
         padding: 12px 32px;
         font-size: 16px;
-        font-family: system-ui, -apple-system, sans-serif;
         font-weight: 700;
-        color: #fff;
-        background: rgba(83, 194, 139, 0.9);
-        border: none;
-        border-radius: 24px;
-        cursor: pointer;
-        z-index: 10;
-        -webkit-tap-highlight-color: transparent;
-        display: none;
+        color: var(--text-white);
+        background: var(--accent);
       }
-      #submit-btn:active { background: rgba(63, 164, 109, 0.95); }
-      #submit-btn:disabled {
-        opacity: 0.5;
-        cursor: default;
-      }
+      #submit-btn:active { background: var(--accent-active); }
+
       #results-btn {
-        position: fixed;
         bottom: 24px;
         right: 24px;
         padding: 12px 32px;
         font-size: 16px;
-        font-family: system-ui, -apple-system, sans-serif;
         font-weight: 700;
-        color: #fff;
-        background: rgba(15, 52, 96, 0.9);
-        border: none;
-        border-radius: 24px;
-        cursor: pointer;
-        z-index: 10;
-        -webkit-tap-highlight-color: transparent;
-        display: none;
+        color: var(--text-white);
+        background: var(--surface-active);
       }
       #results-btn:active { background: rgba(22, 66, 120, 0.95); }
+
       #submit-error {
         position: fixed;
         bottom: 80px;
         right: 24px;
         padding: 10px 20px;
         font-size: 13px;
-        font-family: system-ui, -apple-system, sans-serif;
-        color: #fff;
-        background: rgba(233, 69, 96, 0.9);
+        font-family: var(--font);
+        color: var(--text-white);
+        background: var(--error);
         border-radius: 16px;
         z-index: 10;
         display: none;
         -webkit-tap-highlight-color: transparent;
+        transition: opacity 0.15s ease;
       }
     </style>
   </head>
   <body>
-    <button id="reset-btn">Nulstil</button>
+    <button id="reset-btn" class="btn">Nulstil</button>
     <div id="undo-toast">Fortryd</div>
-    <button id="submit-btn">Send</button>
-    <button id="results-btn">Se resultater</button>
+    <button id="submit-btn" class="btn">Send</button>
+    <button id="results-btn" class="btn">Se resultater</button>
     <div id="submit-error"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
