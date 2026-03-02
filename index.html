@@ -89,6 +89,21 @@
       }
       #results-btn:active { background: rgba(22, 66, 120, 0.95); }
 
+      #instruction {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        text-align: center;
+        padding: 10px 16px;
+        font-family: var(--font);
+        font-size: 14px;
+        color: var(--text);
+        background: linear-gradient(to bottom, var(--bg) 60%, transparent);
+        z-index: 10;
+        pointer-events: none;
+      }
+
       #submit-error {
         position: fixed;
         bottom: 80px;
@@ -107,6 +122,7 @@
     </style>
   </head>
   <body>
+    <div id="instruction">Tegn linjer mellem begivenhederne — hvad har ført til hvad?</div>
     <button id="reset-btn" class="btn">Nulstil</button>
     <div id="undo-toast">Fortryd</div>
     <button id="submit-btn" class="btn">Send</button>
