@@ -26,6 +26,7 @@ const FADE_SPEED = 0.04;
 export interface ConnectionManager {
   connections: Connection[];
   redraw: () => void;
+  resetAll: () => Connection[];
 }
 
 /**
@@ -186,7 +187,15 @@ export function setupConnections(
     }
   }
 
-  return { connections, redraw };
+  function resetAll(): Connection[] {
+    const removed = connections.splice(0, connections.length);
+    selectedBoxIndex = null;
+    drawHighlight();
+    redraw();
+    return removed;
+  }
+
+  return { connections, redraw, resetAll };
 }
 
 function getBezierParams(source: BoxInfo, target: BoxInfo) {
