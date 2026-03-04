@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "mcp__supabase__*",
-      "mcp__supabase__list_migrations"
+      "mcp__supabase__list_migrations",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
