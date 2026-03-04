@@ -23,7 +23,7 @@ if (submitted) {
   const stored = getStoredConnections();
   manager.connections.push(...stored);
   manager.redraw();
-  resultsBtn.style.display = "";
+  resultsBtn.style.display = "block";
 }
 let undoBackup: Connection[] | null = null;
 let undoTimer: ReturnType<typeof setTimeout> | null = null;
@@ -35,8 +35,8 @@ function updateButtonVisibility() {
     return;
   }
   const hasConnections = manager.connections.length > 0;
-  resetBtn.style.display = hasConnections ? "" : "none";
-  submitBtn.style.display = hasConnections ? "" : "none";
+  resetBtn.style.display = hasConnections ? "block" : "none";
+  submitBtn.style.display = hasConnections ? "block" : "none";
 }
 
 // Poll visibility via animation frame
@@ -52,7 +52,7 @@ resetBtn.addEventListener("click", () => {
   if (removed.length === 0) return;
 
   undoBackup = removed;
-  undoToast.style.display = "";
+  undoToast.style.display = "block";
   resetBtn.style.display = "none";
   submitBtn.style.display = "none";
 
@@ -89,12 +89,12 @@ submitBtn.addEventListener("click", async () => {
     submitted = true;
     submitBtn.style.display = "none";
     resetBtn.style.display = "none";
-    resultsBtn.style.display = "";
+    resultsBtn.style.display = "block";
   } catch {
     submitBtn.disabled = false;
     submitBtn.textContent = "Send";
     submitError.textContent = "Noget gik galt — prøv igen";
-    submitError.style.display = "";
+    submitError.style.display = "block";
     setTimeout(() => {
       submitError.style.display = "none";
     }, 4000);
@@ -112,7 +112,7 @@ resultsBtn.addEventListener("click", async () => {
   } catch {
     resultsBtn.textContent = "Se resultater";
     submitError.textContent = "Kunne ikke hente resultater";
-    submitError.style.display = "";
+    submitError.style.display = "block";
     setTimeout(() => {
       submitError.style.display = "none";
     }, 4000);

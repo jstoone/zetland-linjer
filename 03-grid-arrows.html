@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Living Arrows</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f0f10;
+    --grid-bg: #16161a;
+    --box: #1e1e26;
+    --box-border: #2e2e3a;
+    --box-hover: #26263a;
+    --text-dim: #555566;
+  }
+
+  body {
+    background: var(--bg);
+    font-family: 'DM Mono', 'Fira Mono', monospace;
+    color: #c8c8d8;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 32px;
+    user-select: none;
+  }
+
+  header { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; justify-content: center; }
+
+  h1 {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .controls { display: flex; gap: 8px; align-items: center; }
+
+  .color-swatch {
+    width: 16px; height: 16px; border-radius: 50%;
+    cursor: pointer; border: 2px solid transparent;
+    transition: transform 0.15s, border-color 0.15s;
+  }
+  .color-swatch.active { border-color: white; transform: scale(1.25); }
+
+  .btn {
+    font: inherit; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    background: none; border: 1px solid #33333f; color: #666677;
+    padding: 4px 10px; border-radius: 4px; cursor: pointer;
+    transition: border-color 0.15s, color 0.15s; margin-left: 4px;
+  }
+  .btn:hover { border-color: #55556a; color: #9999aa; }
+  .btn.active { border-color: #7b6cff88; color: #9d94ff; }
+
+  .scene {
+    position: relative;
+    width: 720px; height: 720px;
+    cursor: crosshair;
+  }
+
+  .arrow-layer {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none; z-index: 2;
+  }
+  .arrow-layer path.hittable { pointer-events: stroke; }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 24px; width: 100%; height: 100%;
+    position: relative; z-index: 1;
+  }
+
+  .sub-grid {
+    background: var(--grid-bg);
+    border: 1px solid var(--box-border);
+    border-radius: 10px; padding: 10px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .box {
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 8px; color: var(--text-dim); letter-spacing: 0.05em;
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+    cursor: crosshair;
+  }
+  .box:hover           { background: var(--box-hover); border-color: #44445a; }
+  .box.is-source       { background: #2a2a42; border-color: #5a5a8a; }
+  .box.is-target-valid { background: #1e2e26; border-color: #4a8a6a; box-shadow: 0 0 0 2px #6cffb033; }
+
+  .hint { font-size: 10px; color: #333344; letter-spacing: 0.08em; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>living arrows</h1>
+  <div class="controls" id="swatches"></div>
+  <div class="controls">
+    <button class="btn active" id="btnDrift">〜 drift</button>
+    <button class="btn active" id="btnPulse">◉ pulse</button>
+    <button class="btn" id="clearBtn">clear</button>
+  </div>
+</header>
+
+<div class="scene" id="scene">
+  <svg class="arrow-layer" id="arrows" xmlns="http://www.w3.org/2000/svg">
+    <defs id="markerDefs"></defs>
+    <path id="preview" fill="none" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round" stroke-dasharray="6 4" opacity="0.75"/>
+  </svg>
+  <div class="meta-grid">
+    <div class="sub-grid" id="g0"></div>
+    <div class="sub-grid" id="g1"></div>
+    <div class="sub-grid" id="g2"></div>
+    <div class="sub-grid" id="g3"></div>
+  </div>
+</div>
+
+<p class="hint">drag between boxes to connect &nbsp;·&nbsp; click arrow to delete</p>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+const COLORS = ['#7b6cff','#ff6c8a','#6cffb0','#ffd06c','#ff9d6c','#6cc8ff'];
+let activeColor = COLORS[0];
+let arrows = [];
+let dragging = false, sourceEl = null, arrowId = 0;
+let flowEnabled = false, driftEnabled = true, pulseEnabled = true;
+
+// Preview state — cursor position updated on mousemove
+let previewSource = null;   // { x, y } in scene coords
+let previewCursor = null;   // { x, y } in scene coords
+const previewSeed = Math.random() * 100;
+const previewPersonality = { segments: 10, warpAmp: 0.10, warpFreq: 3.0, style: 'snake' };
+let previewFlowOffset = 0;
+
+// ── Build grid ────────────────────────────────────────────────────────────────
+for (let g = 0; g < 4; g++) {
+  const grid = document.getElementById(`g${g}`);
+  for (let i = 0; i < 9; i++) {
+    const box = document.createElement('div');
+    box.className = 'box';
+    box.id = `b${g}-${i}`;
+    box.textContent = `${g},${i}`;
+    grid.appendChild(box);
+  }
+}
+
+// ── Color swatches ────────────────────────────────────────────────────────────
+COLORS.forEach((c, i) => {
+  const s = document.createElement('div');
+  s.className = 'color-swatch' + (i === 0 ? ' active' : '');
+  s.style.cssText = `background:${c};box-shadow:0 0 6px ${c}88`;
+  s.addEventListener('click', () => {
+    document.querySelectorAll('.color-swatch').forEach(x => x.classList.remove('active'));
+    s.classList.add('active');
+    activeColor = c;
+  });
+  document.getElementById('swatches').appendChild(s);
+});
+
+// ── Toggle buttons ────────────────────────────────────────────────────────────
+function toggleBtn(btn, get, set) {
+  btn.addEventListener('click', () => {
+    set(!get());
+    btn.classList.toggle('active', !get() === false);
+    // re-evaluate: if now OFF, remove dasharray from all arrows
+    if (!get()) arrows.forEach(a => {
+      if (btn.id === 'btnFlow') { a.path.style.strokeDashoffset = ''; a.path.setAttribute('stroke-dasharray',''); }
+    });
+  });
+}
+
+document.getElementById('btnDrift').addEventListener('click', function() {
+  driftEnabled = !driftEnabled;
+  this.classList.toggle('active', driftEnabled);
+});
+document.getElementById('btnPulse').addEventListener('click', function() {
+  pulseEnabled = !pulseEnabled;
+  this.classList.toggle('active', pulseEnabled);
+});
+
+// ── SVG helpers ───────────────────────────────────────────────────────────────
+const scene   = document.getElementById('scene');
+const svg     = document.getElementById('arrows');
+const preview = document.getElementById('preview');
+const defs    = document.getElementById('markerDefs');
+
+function sceneCenter(el) {
+  const sr = scene.getBoundingClientRect(), er = el.getBoundingClientRect();
+  return { x: er.left - sr.left + er.width/2, y: er.top - sr.top + er.height/2 };
+}
+function clientToScene(cx, cy) {
+  const sr = scene.getBoundingClientRect();
+  return { x: cx - sr.left, y: cy - sr.top };
+}
+
+// Perlin-ish smooth noise via sine harmonics
+function smoothNoise(x, seed) {
+  return Math.sin(x * 1.3 + seed * 7.1)  * 0.50
+       + Math.sin(x * 2.7 + seed * 3.3)  * 0.30
+       + Math.sin(x * 5.1 + seed * 1.7)  * 0.15
+       + Math.sin(x * 9.3 + seed * 5.9)  * 0.05;
+}
+
+// Build a multi-point SVG path with optional mid-point warp
+// Each arrow has a "personality": number of control points, warp amplitude, warp freq
+function buildPath(s, e, arrow, t) {
+  const { seed, personality } = arrow;
+  const { segments, warpAmp, warpFreq, style } = personality;
+
+  const dx = e.x - s.x, dy = e.y - s.y;
+  const len = Math.sqrt(dx*dx + dy*dy) || 1;
+  // Perpendicular unit vector
+  const px = -dy / len, py = dx / len;
+
+  // Build a polyline of intermediate points, then smooth with cubic beziers
+  const pts = [];
+  for (let i = 0; i <= segments; i++) {
+    const f = i / segments;
+    // Base position along straight line
+    const bx = s.x + dx * f;
+    const by = s.y + dy * f;
+
+    // Drift warp: slow time-varying perpendicular offset
+    let warp = 0;
+    if (driftEnabled) {
+      warp = smoothNoise(f * warpFreq + t * 0.0004 + seed, seed) * warpAmp * len * 0.18;
+    }
+
+    // Extra style personality
+    let extra = 0;
+    if (style === 'loop' && f > 0.3 && f < 0.7) {
+      extra = Math.sin((f - 0.3) / 0.4 * Math.PI) * warpAmp * len * 0.22;
+    } else if (style === 'zigzag') {
+      extra = (i % 2 === 0 ? 1 : -1) * warpAmp * len * 0.08;
+    } else if (style === 'snake') {
+      extra = Math.sin(f * Math.PI * 3 + seed) * warpAmp * len * 0.12;
+    }
+
+    pts.push({ x: bx + (px * (warp + extra)), y: by + (py * (warp + extra)) });
+  }
+
+  // Catmull-Rom → cubic bezier conversion for smooth curve through all pts
+  let d = `M${pts[0].x.toFixed(2)},${pts[0].y.toFixed(2)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i-1)];
+    const p1 = pts[i];
+    const p2 = pts[i+1];
+    const p3 = pts[Math.min(pts.length-1, i+2)];
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}`;
+  }
+  return d;
+}
+
+function ensureMarker(color) {
+  const id = 'mk-' + color.replace('#','');
+  if (!document.getElementById(id)) {
+    const m = document.createElementNS('http://www.w3.org/2000/svg','marker');
+    m.setAttribute('id', id);
+    m.setAttribute('markerWidth','8'); m.setAttribute('markerHeight','8');
+    m.setAttribute('refX','6');        m.setAttribute('refY','3');
+    m.setAttribute('orient','auto');
+    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d','M0,0 L0,6 L8,3 z');
+    p.setAttribute('fill', color);
+    m.appendChild(p); defs.appendChild(m);
+  }
+  return id;
+}
+
+// Arrow personalities
+const PERSONALITIES = [
+  { segments: 8,  warpAmp: 0.08, warpFreq: 2.5, style: 'drift'  },
+  { segments: 10, warpAmp: 0.12, warpFreq: 3.5, style: 'snake'  },
+  { segments: 12, warpAmp: 0.14, warpFreq: 2.0, style: 'loop'   },
+  { segments: 6,  warpAmp: 0.06, warpFreq: 4.0, style: 'zigzag' },
+  { segments: 9,  warpAmp: 0.10, warpFreq: 3.0, style: 'drift'  },
+];
+
+function addArrow(fromEl, toEl) {
+  if (fromEl === toEl) return;
+  if (arrows.find(a => a.fromEl === fromEl && a.toEl === toEl)) return;
+
+  const id = ++arrowId;
+  const color = activeColor;
+  const seed = Math.random() * 100;
+  const personality = PERSONALITIES[Math.floor(Math.random() * PERSONALITIES.length)];
+
+  // Flow dash length based on personality
+  const dashLen = 8 + Math.floor(Math.random() * 16);
+  const gapLen  = 4 + Math.floor(Math.random() * 8);
+  const flowSpeed = 0.8 + Math.random() * 1.4; // px per ms
+
+  const markerId = ensureMarker(color);
+
+  const hit = document.createElementNS('http://www.w3.org/2000/svg','path');
+  hit.setAttribute('fill','none');
+  hit.setAttribute('stroke','transparent');
+  hit.setAttribute('stroke-width','14');
+  hit.classList.add('hittable');
+  hit.style.cursor = 'pointer';
+
+  const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('fill','none');
+  path.setAttribute('stroke', color);
+  path.setAttribute('stroke-width','2');
+  path.setAttribute('stroke-linecap','round');
+  path.setAttribute('stroke-linejoin','round');
+  path.setAttribute('marker-end', `url(#${markerId})`);
+  path.style.filter = `drop-shadow(0 0 4px ${color}88)`;
+  path.classList.add('hittable');
+  path.style.cursor = 'pointer';
+
+  const del = (e) => { e.stopPropagation(); removeArrow(id); };
+  hit.addEventListener('click', del);
+  path.addEventListener('click', del);
+
+  svg.insertBefore(hit, preview);
+  svg.insertBefore(path, preview);
+
+  arrows.push({ id, fromEl, toEl, color, path, hit, seed, personality, dashLen, gapLen, flowSpeed, flowOffset: 0, pulsePhase: Math.random() * Math.PI * 2 });
+}
+
+function removeArrow(id) {
+  const idx = arrows.findIndex(a => a.id === id);
+  if (idx === -1) return;
+  arrows[idx].path.remove();
+  arrows[idx].hit.remove();
+  arrows.splice(idx, 1);
+}
+
+// ── Animation loop ────────────────────────────────────────────────────────────
+let lastT = 0;
+function animate(t) {
+  const dt = t - lastT;
+  lastT = t;
+
+  // Animate the preview while dragging
+  if (dragging && previewSource && previewCursor) {
+    const fakeArrow = { seed: previewSeed, personality: previewPersonality };
+    const d = buildPath(previewSource, previewCursor, fakeArrow, t);
+    preview.setAttribute('d', d);
+    if (flowEnabled) {
+      previewFlowOffset = (previewFlowOffset + 1.2 * dt * 0.05) % 20;
+      preview.setAttribute('stroke-dasharray', '10 6');
+      preview.setAttribute('stroke-dashoffset', -previewFlowOffset);
+    } else {
+      preview.setAttribute('stroke-dasharray', '6 4');
+      preview.setAttribute('stroke-dashoffset', '');
+    }
+  }
+
+  arrows.forEach(arrow => {
+    const s = sceneCenter(arrow.fromEl);
+    const e = sceneCenter(arrow.toEl);
+    const d = buildPath(s, e, arrow, t);
+
+    arrow.path.setAttribute('d', d);
+    arrow.hit.setAttribute('d', d);
+
+    // Flow: animated dash offset
+    if (flowEnabled) {
+      const total = arrow.dashLen + arrow.gapLen;
+      arrow.flowOffset = (arrow.flowOffset + arrow.flowSpeed * dt * 0.05) % total;
+      arrow.path.setAttribute('stroke-dasharray', `${arrow.dashLen} ${arrow.gapLen}`);
+      arrow.path.setAttribute('stroke-dashoffset', -arrow.flowOffset);
+    } else {
+      arrow.path.setAttribute('stroke-dasharray', '');
+    }
+
+    // Pulse: opacity + thickness breathing
+    if (pulseEnabled) {
+      const pulse = 0.75 + 0.25 * Math.sin(t * 0.0015 + arrow.pulsePhase);
+      arrow.path.setAttribute('stroke-width', (1.5 + pulse * 1.0).toFixed(2));
+      arrow.path.style.opacity = (0.65 + pulse * 0.35).toFixed(2);
+    } else {
+      arrow.path.setAttribute('stroke-width', '2');
+      arrow.path.style.opacity = '1';
+    }
+  });
+
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+
+// ── Drag ─────────────────────────────────────────────────────────────────────
+function getBoxAt(cx, cy) {
+  return document.elementsFromPoint(cx, cy).find(el => el.classList && el.classList.contains('box')) || null;
+}
+
+document.addEventListener('mousedown', (e) => {
+  if (!e.target.classList.contains('box')) return;
+  e.preventDefault();
+  dragging = true; sourceEl = e.target;
+  sourceEl.classList.add('is-source');
+  preview.setAttribute('stroke', activeColor);
+  preview.style.filter = `drop-shadow(0 0 5px ${activeColor}99)`;
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!dragging || !sourceEl) return;
+  previewSource = sceneCenter(sourceEl);
+  previewCursor = clientToScene(e.clientX, e.clientY);
+  document.querySelectorAll('.box.is-target-valid').forEach(b => b.classList.remove('is-target-valid'));
+  const target = getBoxAt(e.clientX, e.clientY);
+  if (target && target !== sourceEl) target.classList.add('is-target-valid');
+});
+
+document.addEventListener('mouseup', (e) => {
+  if (!dragging) return;
+  dragging = false;
+  previewSource = null;
+  previewCursor = null;
+  preview.setAttribute('d', '');
+  document.querySelectorAll('.box.is-source, .box.is-target-valid').forEach(b => {
+    b.classList.remove('is-source', 'is-target-valid');
+  });
+  const target = getBoxAt(e.clientX, e.clientY);
+  if (target && target !== sourceEl) addArrow(sourceEl, target);
+  sourceEl = null;
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  [...arrows].forEach(a => removeArrow(a.id));
+});
+</script>
+</body>
+</html>
