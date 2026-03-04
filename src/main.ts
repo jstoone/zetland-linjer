@@ -1,25 +1,13 @@
-import { Application } from "pixi.js";
-import { THEME } from "./config";
 import { createGrid } from "./grid";
 import { Connection, setupConnections } from "./connections";
 import { isSubmitted, getStoredConnections, submitConnections } from "./submit";
 import { createResultsRenderer } from "./results";
 
-const app = new Application();
+const boxes = createGrid();
+const manager = setupConnections(boxes);
+const results = createResultsRenderer(boxes, manager);
 
-await app.init({
-  background: THEME.bgCss,
-  resizeTo: window,
-  antialias: true,
-  resolution: window.devicePixelRatio || 1,
-  autoDensity: true,
-});
-
-document.body.appendChild(app.canvas);
-
-const boxes = createGrid(app);
-const manager = setupConnections(app, boxes);
-const results = createResultsRenderer(app, boxes);
+manager.startAnimation();
 
 // --- UI elements ---
 const resetBtn = document.getElementById("reset-btn") as HTMLButtonElement;
@@ -51,7 +39,7 @@ function updateButtonVisibility() {
   submitBtn.style.display = hasConnections ? "" : "none";
 }
 
-// Poll visibility cheaply via animation frame (connections change from pointer events)
+// Poll visibility via animation frame
 function tick() {
   updateButtonVisibility();
   requestAnimationFrame(tick);

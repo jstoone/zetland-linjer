@@ -1,328 +1,490 @@
-import {
-  Application,
-  Graphics,
-  FederatedPointerEvent,
-  Rectangle,
-} from "pixi.js";
 import { BoxInfo } from "./grid";
-import { THEME } from "./config";
+import { THEME, PERSONALITIES, ArrowPersonality } from "./config";
 
 export interface Connection {
   source: number;
   target: number;
 }
 
-const LINE_COLOR = THEME.line;
-const PREVIEW_COLOR = THEME.preview;
-const SELECTED_COLOR = THEME.selected;
-const LINE_WIDTH = 2.5;
-const PREVIEW_WIDTH = 2;
-const ARROW_SIZE = 8;
-const CURVE_OFFSET_RATIO = 0.15;
 const TAP_THRESHOLD = 10;
-const HIGHLIGHT_RADIUS = 10;
-const LINE_HIT_THRESHOLD = 20;
-const FADE_SPEED = 0.04;
+
+interface Arrow {
+  id: number;
+  source: number;
+  target: number;
+  seed: number;
+  personality: ArrowPersonality;
+  path: SVGPathElement;
+  hit: SVGPathElement;
+  pulsePhase: number;
+}
 
 export interface ConnectionManager {
   connections: Connection[];
   redraw: () => void;
   resetAll: () => Connection[];
+  startAnimation: () => void;
+  stopAnimation: () => void;
+  /** Register external arrows (results) to participate in the animation loop */
+  registerResultArrows: (arrows: ResultArrow[]) => void;
+  clearResultArrows: () => void;
 }
 
-/**
- * Sets up drag-to-connect interaction on the box grid.
- * Returns a ConnectionManager for use by future features (tap-tap, remove, reset).
- */
-export function setupConnections(
-  app: Application,
-  boxes: BoxInfo[],
-): ConnectionManager {
-  const connections: Connection[] = [];
-  const highlightLayer = new Graphics();
-  const linesLayer = new Graphics();
-  const previewLayer = new Graphics();
-  app.stage.addChild(highlightLayer);
-  app.stage.addChild(linesLayer);
-  app.stage.addChild(previewLayer);
+export interface ResultArrow {
+  seed: number;
+  personality: ArrowPersonality;
+  path: SVGPathElement;
+  pulsePhase: number;
+  sourceEl: HTMLDivElement;
+  targetEl: HTMLDivElement;
+  basePulse: boolean;
+}
 
-  let dragSource: BoxInfo | null = null;
-  let pointerX = 0;
-  let pointerY = 0;
+// ── SVG helpers ──────────────────────────────────────────────────────────────
+
+const scene = () => document.getElementById("scene")!;
+const defsEl = () => document.getElementById("marker-defs")!;
+const connectionsLayer = () => document.getElementById("connections-layer")!;
+const previewPath = () => document.getElementById("preview") as unknown as SVGPathElement;
+
+function sceneCenter(el: HTMLElement): { x: number; y: number } {
+  const sr = scene().getBoundingClientRect();
+  const er = el.getBoundingClientRect();
+  return {
+    x: er.left - sr.left + er.width / 2,
+    y: er.top - sr.top + er.height / 2,
+  };
+}
+
+function clientToScene(cx: number, cy: number): { x: number; y: number } {
+  const sr = scene().getBoundingClientRect();
+  return { x: cx - sr.left, y: cy - sr.top };
+}
+
+function smoothNoise(x: number, seed: number): number {
+  return (
+    Math.sin(x * 1.3 + seed * 7.1) * 0.5 +
+    Math.sin(x * 2.7 + seed * 3.3) * 0.3 +
+    Math.sin(x * 5.1 + seed * 1.7) * 0.15 +
+    Math.sin(x * 9.3 + seed * 5.9) * 0.05
+  );
+}
+
+function buildPath(
+  s: { x: number; y: number },
+  e: { x: number; y: number },
+  seed: number,
+  personality: ArrowPersonality,
+  t: number,
+): string {
+  const { segments, warpAmp, warpFreq, style } = personality;
+
+  const dx = e.x - s.x;
+  const dy = e.y - s.y;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const px = -dy / len;
+  const py = dx / len;
+
+  const pts: { x: number; y: number }[] = [];
+  for (let i = 0; i <= segments; i++) {
+    const f = i / segments;
+    const bx = s.x + dx * f;
+    const by = s.y + dy * f;
+
+    const warp =
+      smoothNoise(f * warpFreq + t * 0.0004 + seed, seed) *
+      warpAmp *
+      len *
+      0.18;
+
+    let extra = 0;
+    if (style === "loop" && f > 0.3 && f < 0.7) {
+      extra =
+        Math.sin(((f - 0.3) / 0.4) * Math.PI) * warpAmp * len * 0.22;
+    } else if (style === "zigzag") {
+      extra = (i % 2 === 0 ? 1 : -1) * warpAmp * len * 0.08;
+    } else if (style === "snake") {
+      extra = Math.sin(f * Math.PI * 3 + seed) * warpAmp * len * 0.12;
+    }
+
+    pts.push({
+      x: bx + px * (warp + extra),
+      y: by + py * (warp + extra),
+    });
+  }
+
+  // Catmull-Rom → cubic bezier
+  const first = pts[0]!;
+  let d = `M${first.x.toFixed(2)},${first.y.toFixed(2)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)]!;
+    const p1 = pts[i]!;
+    const p2 = pts[i + 1]!;
+    const p3 = pts[Math.min(pts.length - 1, i + 2)]!;
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}`;
+  }
+  return d;
+}
+
+function ensureMarker(color: string): string {
+  const id = "mk-" + color.replace("#", "");
+  if (!document.getElementById(id)) {
+    const NS = "http://www.w3.org/2000/svg";
+    const m = document.createElementNS(NS, "marker");
+    m.setAttribute("id", id);
+    m.setAttribute("markerWidth", "8");
+    m.setAttribute("markerHeight", "8");
+    m.setAttribute("refX", "6");
+    m.setAttribute("refY", "3");
+    m.setAttribute("orient", "auto");
+    const p = document.createElementNS(NS, "path");
+    p.setAttribute("d", "M0,0 L0,6 L8,3 z");
+    p.setAttribute("fill", color);
+    m.appendChild(p);
+    defsEl().appendChild(m);
+  }
+  return id;
+}
+
+function createSvgPath(): SVGPathElement {
+  return document.createElementNS("http://www.w3.org/2000/svg", "path");
+}
+
+// ── Main setup ───────────────────────────────────────────────────────────────
+
+export function setupConnections(boxes: BoxInfo[]): ConnectionManager {
+  const connections: Connection[] = [];
+  const arrows: Arrow[] = [];
+  let resultArrows: ResultArrow[] = [];
+  let nextId = 0;
+  let animFrameId = 0;
+  let dragging = false;
+  let dragSourceBox: BoxInfo | null = null;
   let dragStartX = 0;
   let dragStartY = 0;
   let selectedBoxIndex: number | null = null;
 
-  function toggle(source: number, target: number) {
-    const idx = connections.findIndex(
-      c => c.source === source && c.target === target
+  const lineColor = THEME.line;
+  const markerId = ensureMarker(lineColor);
+
+  function addArrow(source: number, target: number): Arrow {
+    const seed = Math.random() * 100;
+    const personality =
+      PERSONALITIES[Math.floor(Math.random() * PERSONALITIES.length)]!;
+    const id = ++nextId;
+
+    const layer = connectionsLayer();
+
+    const hit = createSvgPath();
+    hit.setAttribute("fill", "none");
+    hit.setAttribute("stroke", "transparent");
+    hit.setAttribute("stroke-width", "18");
+    hit.classList.add("hittable");
+    hit.style.cursor = "pointer";
+
+    const path = createSvgPath();
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", lineColor);
+    path.setAttribute("stroke-width", "2");
+    path.setAttribute("stroke-linecap", "round");
+    path.setAttribute("stroke-linejoin", "round");
+    path.setAttribute("marker-end", `url(#${markerId})`);
+    path.style.filter = `drop-shadow(0 0 4px ${lineColor}88)`;
+    path.classList.add("hittable");
+    path.style.cursor = "pointer";
+
+    const handleClick = (e: Event) => {
+      e.stopPropagation();
+      removeArrow(id);
+    };
+    hit.addEventListener("click", handleClick);
+    path.addEventListener("click", handleClick);
+
+    layer.appendChild(hit);
+    layer.appendChild(path);
+
+    const arrow: Arrow = {
+      id,
+      source,
+      target,
+      seed,
+      personality,
+      path,
+      hit,
+      pulsePhase: Math.random() * Math.PI * 2,
+    };
+    arrows.push(arrow);
+    return arrow;
+  }
+
+  function removeArrow(id: number) {
+    const idx = arrows.findIndex((a) => a.id === id);
+    if (idx === -1) return;
+    const arrow = arrows[idx]!;
+
+    // Fade out
+    arrow.path.style.transition = "opacity 0.3s ease";
+    arrow.hit.style.transition = "opacity 0.3s ease";
+    arrow.path.style.opacity = "0";
+    arrow.hit.style.opacity = "0";
+
+    setTimeout(() => {
+      arrow.path.remove();
+      arrow.hit.remove();
+    }, 300);
+
+    arrows.splice(idx, 1);
+
+    // Also remove from connections
+    const connIdx = connections.findIndex(
+      (c) => c.source === arrow.source && c.target === arrow.target,
     );
-    if (idx >= 0) {
-      animateRemoval(app, boxes, connections.splice(idx, 1)[0]!);
+    if (connIdx >= 0) connections.splice(connIdx, 1);
+
+    updateSelection(null);
+  }
+
+  function toggle(source: number, target: number) {
+    const connIdx = connections.findIndex(
+      (c) => c.source === source && c.target === target,
+    );
+    if (connIdx >= 0) {
+      // Remove
+      const conn = connections[connIdx]!;
+      const arrowIdx = arrows.findIndex(
+        (a) => a.source === conn.source && a.target === conn.target,
+      );
+      if (arrowIdx >= 0) {
+        const arrow = arrows[arrowIdx]!;
+        arrow.path.style.transition = "opacity 0.3s ease";
+        arrow.hit.style.transition = "opacity 0.3s ease";
+        arrow.path.style.opacity = "0";
+        arrow.hit.style.opacity = "0";
+        setTimeout(() => {
+          arrow.path.remove();
+          arrow.hit.remove();
+        }, 300);
+        arrows.splice(arrowIdx, 1);
+      }
+      connections.splice(connIdx, 1);
     } else {
       connections.push({ source, target });
+      addArrow(source, target);
     }
   }
 
-  // Make each box interactive
-  for (const box of boxes) {
-    box.container.eventMode = "static";
-    box.container.cursor = "pointer";
-    box.container.hitArea = new Rectangle(0, 0, box.w, box.h);
-    box.container.on("pointerdown", (e: FederatedPointerEvent) => {
-      dragSource = box;
-      dragStartX = e.global.x;
-      dragStartY = e.global.y;
-      pointerX = e.global.x;
-      pointerY = e.global.y;
-    });
+  function updateSelection(index: number | null) {
+    selectedBoxIndex = index;
+    for (const box of boxes) {
+      box.element.classList.toggle(
+        "is-selected",
+        index === box.index,
+      );
+    }
   }
 
-  // Stage-level handlers for move and up
-  app.stage.eventMode = "static";
-  app.stage.hitArea = app.screen;
+  function getBoxAt(cx: number, cy: number): BoxInfo | null {
+    const els = document.elementsFromPoint(cx, cy);
+    for (const el of els) {
+      if (el instanceof HTMLElement && el.classList.contains("box")) {
+        const idx = el.dataset.boxIndex;
+        if (idx !== undefined) return boxes[Number(idx)] ?? null;
+      }
+    }
+    return null;
+  }
 
-  app.stage.on("pointermove", (e: FederatedPointerEvent) => {
-    if (!dragSource) return;
-    pointerX = e.global.x;
-    pointerY = e.global.y;
-    drawPreview();
+  // ── Pointer events ──
+
+  const sceneEl = scene();
+
+  sceneEl.addEventListener("pointerdown", (e: PointerEvent) => {
+    const box = getBoxAt(e.clientX, e.clientY);
+    if (!box) return;
+
+    dragging = true;
+    dragSourceBox = box;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    box.element.classList.add("is-source");
+
+    previewPath().setAttribute("stroke", THEME.preview);
+    previewPath().style.filter = `drop-shadow(0 0 5px ${THEME.preview}99)`;
   });
 
-  const endDrag = (e: FederatedPointerEvent) => {
-    if (!dragSource) return;
+  sceneEl.addEventListener("pointermove", (e: PointerEvent) => {
+    if (!dragging || !dragSourceBox) return;
 
-    const dx = e.global.x - dragStartX;
-    const dy = e.global.y - dragStartY;
-    const movedDist = Math.sqrt(dx * dx + dy * dy);
+    const previewSrc = sceneCenter(dragSourceBox.element);
+    const previewCur = clientToScene(e.clientX, e.clientY);
 
-    if (movedDist < TAP_THRESHOLD) {
-      // It's a tap — handle tap-tap selection
-      const tappedBox = hitTest(e.global.x, e.global.y, boxes);
+    const fakeArrow = {
+      seed: 42,
+      personality: {
+        segments: 10,
+        warpAmp: 0.1,
+        warpFreq: 3.0,
+        style: "snake" as const,
+      },
+    };
+    const d = buildPath(
+      previewSrc,
+      previewCur,
+      fakeArrow.seed,
+      fakeArrow.personality,
+      performance.now(),
+    );
+    previewPath().setAttribute("d", d);
+
+    // Highlight target
+    document
+      .querySelectorAll(".box.is-target-valid")
+      .forEach((b) => b.classList.remove("is-target-valid"));
+    const target = getBoxAt(e.clientX, e.clientY);
+    if (target && target.index !== dragSourceBox.index) {
+      target.element.classList.add("is-target-valid");
+    }
+  });
+
+  const endDrag = (e: PointerEvent) => {
+    if (!dragging || !dragSourceBox) return;
+
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist < TAP_THRESHOLD) {
+      // Tap
+      const tappedBox = getBoxAt(e.clientX, e.clientY);
       if (tappedBox) {
         if (selectedBoxIndex === null) {
-          // No selection — select this box
-          selectedBoxIndex = tappedBox.index;
+          updateSelection(tappedBox.index);
         } else if (selectedBoxIndex === tappedBox.index) {
-          // Same box — deselect
-          selectedBoxIndex = null;
+          updateSelection(null);
         } else {
-          // Different box — toggle connection from selected to tapped
           toggle(selectedBoxIndex, tappedBox.index);
-          selectedBoxIndex = null;
-          redraw();
+          updateSelection(null);
         }
       } else {
-        // Tapped empty space — check if tapped on a line
-        const lineIdx = hitTestLine(e.global.x, e.global.y, connections, boxes);
-        if (lineIdx >= 0) {
-          animateRemoval(app, boxes, connections.splice(lineIdx, 1)[0]!);
-          redraw();
-        }
-        selectedBoxIndex = null;
+        updateSelection(null);
       }
-      drawHighlight();
     } else {
-      // It's a drag — existing behavior
-      const target = hitTest(e.global.x, e.global.y, boxes);
-      if (target && target.index !== dragSource.index) {
-        toggle(dragSource.index, target.index);
-        redraw();
+      // Drag
+      const target = getBoxAt(e.clientX, e.clientY);
+      if (target && target.index !== dragSourceBox.index) {
+        toggle(dragSourceBox.index, target.index);
       }
     }
 
-    dragSource = null;
-    previewLayer.clear();
+    // Clean up
+    dragSourceBox.element.classList.remove("is-source");
+    document
+      .querySelectorAll(".box.is-target-valid")
+      .forEach((b) => b.classList.remove("is-target-valid"));
+    dragging = false;
+    dragSourceBox = null;
+    previewPath().setAttribute("d", "");
   };
 
-  app.stage.on("pointerup", endDrag);
-  app.stage.on("pointerupoutside", endDrag);
-  app.stage.on("pointercancel", () => {
-    dragSource = null;
-    previewLayer.clear();
+  sceneEl.addEventListener("pointerup", endDrag);
+  sceneEl.addEventListener("pointercancel", () => {
+    if (dragSourceBox) {
+      dragSourceBox.element.classList.remove("is-source");
+    }
+    document
+      .querySelectorAll(".box.is-target-valid")
+      .forEach((b) => b.classList.remove("is-target-valid"));
+    dragging = false;
+    dragSourceBox = null;
+    previewPath().setAttribute("d", "");
   });
 
-  function drawPreview() {
-    previewLayer.clear();
-    if (!dragSource) return;
+  // ── Animation loop ──
 
-    const sx = dragSource.cx;
-    const sy = dragSource.cy;
-    const dx = pointerX - sx;
-    const dy = pointerY - sy;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < 5) return;
+  function animate(t: number) {
+    // Animate user arrows
+    for (const arrow of arrows) {
+      const s = sceneCenter(boxes[arrow.source]!.element);
+      const e = sceneCenter(boxes[arrow.target]!.element);
+      const d = buildPath(s, e, arrow.seed, arrow.personality, t);
+      arrow.path.setAttribute("d", d);
+      arrow.hit.setAttribute("d", d);
 
-    const perpX = -dy / dist;
-    const perpY = dx / dist;
-    const offset = dist * 0.1;
-    const cpX = (sx + pointerX) / 2 + perpX * offset;
-    const cpY = (sy + pointerY) / 2 + perpY * offset;
+      // Pulse
+      const pulse =
+        0.75 + 0.25 * Math.sin(t * 0.0015 + arrow.pulsePhase);
+      arrow.path.setAttribute(
+        "stroke-width",
+        (1.5 + pulse * 1.0).toFixed(2),
+      );
+      arrow.path.style.opacity = (0.65 + pulse * 0.35).toFixed(2);
+    }
 
-    previewLayer.moveTo(sx, sy);
-    previewLayer.quadraticCurveTo(cpX, cpY, pointerX, pointerY);
-    previewLayer.stroke({
-      width: PREVIEW_WIDTH,
-      color: PREVIEW_COLOR,
-      alpha: 0.6,
-    });
+    // Animate result arrows
+    for (const ra of resultArrows) {
+      const s = sceneCenter(ra.sourceEl);
+      const e = sceneCenter(ra.targetEl);
+      const d = buildPath(s, e, ra.seed, ra.personality, t);
+      ra.path.setAttribute("d", d);
+
+      if (ra.basePulse) {
+        const pulse =
+          0.75 + 0.25 * Math.sin(t * 0.0015 + ra.pulsePhase);
+        ra.path.style.opacity = (0.5 + pulse * 0.2).toFixed(2);
+      }
+    }
+
+    animFrameId = requestAnimationFrame(animate);
   }
 
-  function drawHighlight() {
-    highlightLayer.clear();
-    if (selectedBoxIndex === null) return;
-    const b = boxes[selectedBoxIndex]!;
-    const left = b.cx - b.w / 2;
-    const top = b.cy - b.h / 2;
-    highlightLayer.roundRect(left, top, b.w, b.h, HIGHLIGHT_RADIUS);
-    highlightLayer.fill({ color: SELECTED_COLOR, alpha: 0.15 });
-    highlightLayer.stroke({ width: 2, color: SELECTED_COLOR, alpha: 0.8 });
+  function startAnimation() {
+    animFrameId = requestAnimationFrame(animate);
   }
+
+  function stopAnimation() {
+    cancelAnimationFrame(animFrameId);
+  }
+
+  // ── Public API ──
 
   function redraw() {
-    linesLayer.clear();
+    // Clear all SVG arrows and rebuild from connections
+    for (const arrow of arrows) {
+      arrow.path.remove();
+      arrow.hit.remove();
+    }
+    arrows.length = 0;
     for (const conn of connections) {
-      const source = boxes[conn.source]!;
-      const target = boxes[conn.target]!;
-      drawConnection(linesLayer, source, target);
+      addArrow(conn.source, conn.target);
     }
   }
 
   function resetAll(): Connection[] {
     const removed = connections.splice(0, connections.length);
-    selectedBoxIndex = null;
-    drawHighlight();
-    redraw();
+    for (const arrow of arrows) {
+      arrow.path.remove();
+      arrow.hit.remove();
+    }
+    arrows.length = 0;
+    updateSelection(null);
     return removed;
   }
 
-  return { connections, redraw, resetAll };
-}
-
-function getBezierParams(source: BoxInfo, target: BoxInfo) {
-  const dx = target.cx - source.cx;
-  const dy = target.cy - source.cy;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist < 1) return null;
-
-  const start = boxEdge(source, target.cx, target.cy);
-  const end = boxEdge(target, source.cx, source.cy);
-
-  const perpX = -dy / dist;
-  const perpY = dx / dist;
-  const offset = dist * CURVE_OFFSET_RATIO;
-
-  const midX = (source.cx + target.cx) / 2;
-  const midY = (source.cy + target.cy) / 2;
-
   return {
-    start,
-    end,
-    cpX: midX + perpX * offset,
-    cpY: midY + perpY * offset,
+    connections,
+    redraw,
+    resetAll,
+    startAnimation,
+    stopAnimation,
+    registerResultArrows(ra: ResultArrow[]) {
+      resultArrows = ra;
+    },
+    clearResultArrows() {
+      resultArrows = [];
+    },
   };
-}
-
-export function drawConnection(g: Graphics, source: BoxInfo, target: BoxInfo, color: number = LINE_COLOR, width: number = LINE_WIDTH) {
-  const bez = getBezierParams(source, target);
-  if (!bez) return;
-
-  g.moveTo(bez.start.x, bez.start.y);
-  g.quadraticCurveTo(bez.cpX, bez.cpY, bez.end.x, bez.end.y);
-  g.stroke({ width, color });
-
-  const tdx = bez.end.x - bez.cpX;
-  const tdy = bez.end.y - bez.cpY;
-  const tLen = Math.sqrt(tdx * tdx + tdy * tdy);
-  if (tLen < 1) return;
-
-  const ux = tdx / tLen;
-  const uy = tdy / tLen;
-
-  g.moveTo(bez.end.x, bez.end.y);
-  g.lineTo(
-    bez.end.x - ux * ARROW_SIZE + uy * ARROW_SIZE * 0.4,
-    bez.end.y - uy * ARROW_SIZE - ux * ARROW_SIZE * 0.4,
-  );
-  g.lineTo(
-    bez.end.x - ux * ARROW_SIZE - uy * ARROW_SIZE * 0.4,
-    bez.end.y - uy * ARROW_SIZE + ux * ARROW_SIZE * 0.4,
-  );
-  g.closePath();
-  g.fill({ color });
-}
-
-function hitTestLine(
-  x: number,
-  y: number,
-  connections: Connection[],
-  boxes: BoxInfo[],
-): number {
-  for (let i = 0; i < connections.length; i++) {
-    const conn = connections[i]!;
-    const bez = getBezierParams(boxes[conn.source]!, boxes[conn.target]!);
-    if (!bez) continue;
-
-    for (let t = 0; t <= 1; t += 0.05) {
-      const mt = 1 - t;
-      const px = mt * mt * bez.start.x + 2 * mt * t * bez.cpX + t * t * bez.end.x;
-      const py = mt * mt * bez.start.y + 2 * mt * t * bez.cpY + t * t * bez.end.y;
-      if ((x - px) ** 2 + (y - py) ** 2 < LINE_HIT_THRESHOLD ** 2) return i;
-    }
-  }
-  return -1;
-}
-
-function animateRemoval(
-  app: Application,
-  boxes: BoxInfo[],
-  conn: Connection,
-) {
-  const layer = new Graphics();
-  app.stage.addChild(layer);
-  drawConnection(layer, boxes[conn.source]!, boxes[conn.target]!);
-  layer.alpha = 0.8;
-
-  const fade = () => {
-    layer.alpha -= FADE_SPEED;
-    if (layer.alpha <= 0) {
-      app.ticker.remove(fade);
-      app.stage.removeChild(layer);
-      layer.destroy();
-    }
-  };
-  app.ticker.add(fade);
-}
-
-/** Computes where a ray from the box center toward (toX, toY) exits the box boundary. */
-function boxEdge(
-  box: BoxInfo,
-  toX: number,
-  toY: number,
-): { x: number; y: number } {
-  const dx = toX - box.cx;
-  const dy = toY - box.cy;
-  if (dx === 0 && dy === 0) return { x: box.cx, y: box.cy };
-
-  const halfW = box.w / 2;
-  const halfH = box.h / 2;
-  const scale =
-    Math.abs(dx) / halfW > Math.abs(dy) / halfH
-      ? halfW / Math.abs(dx)
-      : halfH / Math.abs(dy);
-
-  return { x: box.cx + dx * scale, y: box.cy + dy * scale };
-}
-
-function hitTest(x: number, y: number, boxes: BoxInfo[]): BoxInfo | null {
-  for (const box of boxes) {
-    const left = box.cx - box.w / 2;
-    const right = box.cx + box.w / 2;
-    const top = box.cy - box.h / 2;
-    const bottom = box.cy + box.h / 2;
-    if (x >= left && x <= right && y >= top && y <= bottom) {
-      return box;
-    }
-  }
-  return null;
 }

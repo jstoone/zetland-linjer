@@ -6,23 +6,143 @@
     <title>Linjer</title>
     <style>
       :root {
-        --bg: #1a1a2e;
-        --text: #e2e2e2;
-        --text-white: #fff;
-        --surface: rgba(22, 33, 62, 0.85);
-        --surface-active: rgba(15, 52, 96, 0.95);
-        --surface-border: #0f3460;
-        --accent: rgba(83, 194, 139, 0.9);
-        --accent-active: rgba(63, 164, 109, 0.95);
-        --error: rgba(233, 69, 96, 0.9);
+        --bg: #FFF5E6;
+        --text: #1A1A1A;
+        --text-white: #FFFFFF;
+        --surface: #2D3180;
+        --surface-active: #3B40A0;
+        --surface-border: #2D3180;
+        --accent: #FF4713;
+        --accent-active: #E03A0A;
+        --error: #E04560;
         --font: system-ui, -apple-system, sans-serif;
         --radius: 24px;
+
+        --box-fill: #FFFFFF;
+        --box-border: #F0E4D4;
+        --box-glow: #FDDDD4;
+        --line-color: #FF4713;
+        --selected-color: #2D3180;
       }
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); }
-      canvas { display: block; touch-action: none; }
+      html, body {
+        width: 100%; height: 100%; overflow: hidden;
+        background: var(--bg);
+        user-select: none;
+        -webkit-user-select: none;
+      }
 
-      /* Shared button base */
+      /* ── Scene: fixed full-viewport container ── */
+      .scene {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        touch-action: none;
+      }
+
+      /* ── SVG overlay for arrows ── */
+      .arrow-layer {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 2;
+      }
+      .arrow-layer path.hittable {
+        pointer-events: stroke;
+        cursor: pointer;
+      }
+
+      /* ── CSS Grid: 3 columns × 4 rows ── */
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(4, 1fr);
+        gap: 10px;
+        width: calc(100% - 32px);
+        height: calc(100% - 80px);
+        max-width: 500px;
+        max-height: 800px;
+        padding: 16px;
+        position: relative;
+        z-index: 1;
+      }
+
+      /* ── Box ── */
+      .box {
+        position: relative;
+        background: var(--box-fill);
+        border: 1.5px solid var(--box-border);
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 6px;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+        overflow: hidden;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      /* Subtle shadow */
+      .box::before {
+        content: "";
+        position: absolute;
+        inset: -4px;
+        border-radius: 16px;
+        background: transparent;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        z-index: -1;
+        pointer-events: none;
+      }
+
+      .box:hover {
+        background: #FFF0E0;
+        border-color: #E0D0BE;
+      }
+
+      .box.is-selected {
+        background: rgba(45, 49, 128, 0.08);
+        border-color: var(--selected-color);
+        box-shadow: 0 0 0 2px rgba(45, 49, 128, 0.2);
+      }
+
+      .box.is-source {
+        background: #FFF0E0;
+        border-color: var(--line-color);
+        box-shadow: 0 0 8px rgba(255, 71, 19, 0.25);
+      }
+
+      .box.is-target-valid {
+        background: rgba(45, 49, 128, 0.06);
+        border-color: var(--selected-color);
+        box-shadow: 0 0 0 2px rgba(45, 49, 128, 0.2);
+      }
+
+      .box-label {
+        font-family: var(--font);
+        font-size: 12px;
+        line-height: 1.3;
+        color: var(--text);
+        text-align: center;
+        pointer-events: none;
+      }
+
+      .box-year {
+        font-family: var(--font);
+        font-size: 10px;
+        font-style: italic;
+        color: var(--text);
+        opacity: 0.45;
+        margin-top: 2px;
+        pointer-events: none;
+      }
+
+      /* ── Shared button base ── */
       .btn {
         position: fixed;
         font-family: var(--font);
@@ -43,7 +163,7 @@
         transform: translateX(-50%);
         padding: 10px 28px;
         font-size: 15px;
-        color: var(--text);
+        color: var(--text-white);
         background: var(--surface);
         border: 1.5px solid var(--surface-border);
       }
@@ -57,7 +177,7 @@
         padding: 10px 24px;
         font-size: 14px;
         font-family: var(--font);
-        color: var(--text);
+        color: var(--text-white);
         background: var(--accent);
         border-radius: 20px;
         cursor: pointer;
@@ -87,7 +207,7 @@
         color: var(--text-white);
         background: var(--surface-active);
       }
-      #results-btn:active { background: rgba(22, 66, 120, 0.95); }
+      #results-btn:active { background: #3B40A0; }
 
       #instruction {
         position: fixed;
@@ -97,7 +217,7 @@
         text-align: center;
         padding: 10px 16px;
         font-family: var(--font);
-        font-size: 14px;
+        font-size: 15px;
         color: var(--text);
         background: linear-gradient(to bottom, var(--bg) 60%, transparent);
         z-index: 10;
@@ -111,7 +231,7 @@
         padding: 10px 20px;
         font-size: 13px;
         font-family: var(--font);
-        color: var(--text-white);
+        color: #FFFFFF;
         background: var(--error);
         border-radius: 16px;
         z-index: 10;
@@ -123,6 +243,19 @@
   </head>
   <body>
     <div id="instruction">Tegn linjer mellem begivenhederne — hvad har ført til hvad?</div>
+
+    <div class="scene" id="scene">
+      <svg class="arrow-layer" id="arrows" xmlns="http://www.w3.org/2000/svg">
+        <defs id="marker-defs"></defs>
+        <g id="results-layer"></g>
+        <g id="user-results-layer"></g>
+        <g id="connections-layer"></g>
+        <path id="preview" fill="none" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" stroke-dasharray="6 4" opacity="0.75"/>
+      </svg>
+      <div class="grid" id="grid"></div>
+    </div>
+
     <button id="reset-btn" class="btn">Nulstil</button>
     <div id="undo-toast">Fortryd</div>
     <button id="submit-btn" class="btn">Send</button>

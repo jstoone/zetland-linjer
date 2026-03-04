@@ -1,37 +1,43 @@
 /**
  * Color theme — all visual colors in one place.
- * Change these to re-skin the entire app.
+ * All values are CSS-compatible strings.
  */
 export const THEME = {
-  /** Canvas / page background */
-  bg: 0x1a1a2e,
-  bgCss: "#1a1a2e",
+  /** Page background — warm cream */
+  bg: "#FFF5E6",
 
   /** Box styling */
-  boxFill: 0x16213e,
-  boxBorder: 0x0f3460,
-  boxGlow: 0x0f3460,
+  boxFill: "#FFFFFF",
+  boxBorder: "#F0E4D4",
+  boxGlow: "#FDDDD4",
 
   /** Text */
-  text: "#e2e2e2",
-  textWhite: "#fff",
+  text: "#1A1A1A",
 
   /** Connections — user-drawn lines */
-  line: 0xe94560,
-  preview: 0x53c28b,
-  selected: 0x53c28b,
+  line: "#FF4713",
+  preview: "#2D3180",
+  selected: "#2D3180",
 
   /** Aggregate results overlay */
-  aggregate: 0x8899bb,
-  userHighlight: 0xe94560,
+  aggregate: "#2D3180",
+  userHighlight: "#FF4713",
 
   /** UI accents (buttons, toasts) */
-  accent: "rgba(83, 194, 139, 0.9)",
-  accentActive: "rgba(63, 164, 109, 0.95)",
-  surface: "rgba(22, 33, 62, 0.85)",
-  surfaceActive: "rgba(15, 52, 96, 0.95)",
-  error: "rgba(233, 69, 96, 0.9)",
+  accent: "#FF4713",
+  accentActive: "#E03A0A",
+  surface: "#2D3180",
+  surfaceActive: "#3B40A0",
+  error: "#E04560",
 } as const;
+
+/** Visual layout: rows from top (Tier 4) to bottom (Tier 1). Values are box indices (0-based). */
+export const ROWS: number[][] = [
+  [9, 10, 11], // Tier 4 (top) — boxes 10, 11, 12
+  [6, 7, 8],   // Tier 3       — boxes 7, 8, 9
+  [3, 4, 5],   // Tier 2       — boxes 4, 5, 6
+  [0, 1, 2],   // Tier 1 (bot) — boxes 1, 2, 3
+];
 
 /**
  * Box labels — ordered by box number (1-based index).
@@ -40,8 +46,6 @@ export const THEME = {
  *   Row 2 (Tier 2):      4–6
  *   Row 3 (Tier 3):      7–9
  *   Top row (Tier 4):    10–12
- *
- * Swap labels here to change what appears in the boxes.
  */
 export const BOX_LABELS: string[] = [
   "11. september-angrebet",                  // 1  (Tier 1)
@@ -72,4 +76,19 @@ export const BOX_YEARS: string[] = [
   "2016–2021",    // 10
   "2022–2026",    // 11
   "2016–2019",    // 12
+];
+
+export interface ArrowPersonality {
+  segments: number;
+  warpAmp: number;
+  warpFreq: number;
+  style: "drift" | "snake" | "loop" | "zigzag";
+}
+
+export const PERSONALITIES: ArrowPersonality[] = [
+  { segments: 8,  warpAmp: 0.08, warpFreq: 2.5, style: "drift"  },
+  { segments: 10, warpAmp: 0.12, warpFreq: 3.5, style: "snake"  },
+  { segments: 12, warpAmp: 0.14, warpFreq: 2.0, style: "loop"   },
+  { segments: 6,  warpAmp: 0.06, warpFreq: 4.0, style: "zigzag" },
+  { segments: 9,  warpAmp: 0.10, warpFreq: 3.0, style: "drift"  },
 ];
