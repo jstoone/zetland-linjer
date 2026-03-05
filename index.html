@@ -55,6 +55,9 @@
         pointer-events: stroke;
         cursor: pointer;
       }
+      .arrow-layer text {
+        pointer-events: none;
+      }
 
       /* ── CSS Grid: 3 columns × 4 rows ── */
       .grid {
@@ -247,8 +250,10 @@
     <div class="scene" id="scene">
       <svg class="arrow-layer" id="arrows" xmlns="http://www.w3.org/2000/svg">
         <defs id="marker-defs"></defs>
-        <g id="results-layer"></g>
+        <g id="results-bg-layer"></g>
         <g id="user-results-layer"></g>
+        <g id="results-layer"></g>
+        <g id="results-labels-layer"></g>
         <g id="connections-layer"></g>
         <path id="preview" fill="none" stroke-width="2" stroke-linecap="round"
               stroke-linejoin="round" stroke-dasharray="6 4" opacity="0.75"/>

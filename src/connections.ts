@@ -38,6 +38,11 @@ export interface ResultArrow {
   sourceEl: HTMLDivElement;
   targetEl: HTMLDivElement;
   basePulse: boolean;
+  revealAt?: number;
+  revealDuration?: number;
+  targetOpacity?: number;
+  countLabel?: SVGTextElement;
+  countBg?: SVGRectElement;
 }
 
 // ── SVG helpers ──────────────────────────────────────────────────────────────
@@ -426,15 +431,44 @@ export function setupConnections(boxes: BoxInfo[]): ConnectionManager {
 
     // Animate result arrows
     for (const ra of resultArrows) {
+      // Compute reveal alpha (0→1 fade-in)
+      let revealAlpha = 1;
+      if (ra.revealAt !== undefined) {
+        const elapsed = t - ra.revealAt;
+        const duration = ra.revealDuration ?? 400;
+        if (elapsed < 0) {
+          revealAlpha = 0;
+        } else if (elapsed < duration) {
+          revealAlpha = elapsed / duration;
+        }
+      }
+
       const s = sceneCenter(ra.sourceEl);
       const e = sceneCenter(ra.targetEl);
       const d = buildPath(s, e, ra.seed, ra.personality, t);
       ra.path.setAttribute("d", d);
 
+      const maxOpacity = ra.targetOpacity ?? 0.7;
       if (ra.basePulse) {
         const pulse =
           0.75 + 0.25 * Math.sin(t * 0.0015 + ra.pulsePhase);
-        ra.path.style.opacity = (0.5 + pulse * 0.2).toFixed(2);
+        ra.path.style.opacity = ((0.5 + pulse * 0.2) * revealAlpha).toFixed(2);
+      } else {
+        ra.path.style.opacity = (maxOpacity * revealAlpha).toFixed(2);
+      }
+
+      // Reposition count label at midpoint
+      if (ra.countLabel && ra.countBg) {
+        const mx = (s.x + e.x) / 2;
+        const my = (s.y + e.y) / 2;
+        const bw = 28;
+        const bh = 20;
+        ra.countLabel.setAttribute("x", String(mx));
+        ra.countLabel.setAttribute("y", String(my));
+        ra.countBg.setAttribute("x", String(mx - bw / 2));
+        ra.countBg.setAttribute("y", String(my - bh / 2));
+        ra.countLabel.style.opacity = revealAlpha.toFixed(2);
+        ra.countBg.style.opacity = (revealAlpha * 0.85).toFixed(2);
       }
     }
 
