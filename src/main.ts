@@ -2,6 +2,7 @@ import { createGrid } from "./grid";
 import { Connection, setupConnections } from "./connections";
 import { isSubmitted, getStoredConnections, submitConnections } from "./submit";
 import { createResultsRenderer } from "./results";
+import { supabase } from "./supabase";
 
 const boxes = createGrid();
 const manager = setupConnections(boxes);
@@ -110,6 +111,22 @@ resultsBtn.addEventListener("click", async () => {
   resultsBtn.textContent = "Henter...";
 
   try {
+    // Check if results are enabled
+    const { data } = await supabase
+      .from("settings")
+      .select("results_active")
+      .single();
+
+    if (!data?.results_active) {
+      resultsBtn.textContent = "Se resultater";
+      submitError.textContent = "Vi regner på det, læg du bare telefonen væk";
+      submitError.style.display = "block";
+      setTimeout(() => {
+        submitError.style.display = "none";
+      }, 4000);
+      return;
+    }
+
     await results.showResults(manager.connections);
     resultsBtn.textContent = "Opdater resultater";
   } catch {
