@@ -17,6 +17,7 @@ const resultsBtn = document.getElementById("results-btn") as HTMLButtonElement;
 const submitError = document.getElementById("submit-error") as HTMLDivElement;
 
 let submitted = isSubmitted();
+let submitting = false;
 
 // Restore connections from localStorage if previously submitted
 if (submitted) {
@@ -29,9 +30,9 @@ let undoBackup: Connection[] | null = null;
 let undoTimer: ReturnType<typeof setTimeout> | null = null;
 
 function updateButtonVisibility() {
-  if (submitted) {
+  if (submitted || submitting) {
     resetBtn.style.display = "none";
-    submitBtn.style.display = "none";
+    submitBtn.style.display = submitting ? "block" : "none";
     return;
   }
   const hasConnections = manager.connections.length > 0;
@@ -80,6 +81,7 @@ undoToast.addEventListener("click", () => {
 submitBtn.addEventListener("click", async () => {
   if (submitted || manager.connections.length === 0) return;
 
+  submitting = true;
   submitBtn.disabled = true;
   submitBtn.textContent = "Sender...";
   submitError.style.display = "none";
@@ -91,6 +93,7 @@ submitBtn.addEventListener("click", async () => {
     resetBtn.style.display = "none";
     resultsBtn.style.display = "block";
   } catch {
+    submitting = false;
     submitBtn.disabled = false;
     submitBtn.textContent = "Send";
     submitError.textContent = "Noget gik galt — prøv igen";
