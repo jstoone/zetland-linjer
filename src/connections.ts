@@ -172,6 +172,7 @@ export function setupConnections(boxes: BoxInfo[]): ConnectionManager {
   let dragStartX = 0;
   let dragStartY = 0;
   let selectedBoxIndex: number | null = null;
+  let hoveredBoxIndex: number | null = null;
 
   const lineColor = THEME.line;
   const markerId = ensureMarker(lineColor);
@@ -303,6 +304,12 @@ export function setupConnections(boxes: BoxInfo[]): ConnectionManager {
     return null;
   }
 
+  function bop(el: HTMLElement) {
+    el.classList.remove("is-bop");
+    void el.offsetWidth; // force reflow to restart animation
+    el.classList.add("is-bop");
+  }
+
   // ── Pointer events ──
 
   const sceneEl = scene();
@@ -316,6 +323,7 @@ export function setupConnections(boxes: BoxInfo[]): ConnectionManager {
     dragStartX = e.clientX;
     dragStartY = e.clientY;
     box.element.classList.add("is-source");
+    bop(box.element);
 
     previewPath().setAttribute("stroke", THEME.preview);
     previewPath().style.filter = `drop-shadow(0 0 5px ${THEME.preview}99)`;
@@ -350,8 +358,13 @@ export function setupConnections(boxes: BoxInfo[]): ConnectionManager {
       .querySelectorAll(".box.is-target-valid")
       .forEach((b) => b.classList.remove("is-target-valid"));
     const target = getBoxAt(e.clientX, e.clientY);
-    if (target && target.index !== dragSourceBox.index) {
-      target.element.classList.add("is-target-valid");
+    const targetIdx = target && target.index !== dragSourceBox.index ? target.index : null;
+    if (targetIdx !== null) {
+      target!.element.classList.add("is-target-valid");
+    }
+    if (targetIdx !== hoveredBoxIndex) {
+      if (targetIdx !== null) bop(boxes[targetIdx]!.element);
+      hoveredBoxIndex = targetIdx;
     }
   });
 
@@ -372,6 +385,7 @@ export function setupConnections(boxes: BoxInfo[]): ConnectionManager {
           updateSelection(null);
         } else {
           toggle(selectedBoxIndex, tappedBox.index);
+          bop(tappedBox.element);
           updateSelection(null);
         }
       } else {
@@ -382,6 +396,7 @@ export function setupConnections(boxes: BoxInfo[]): ConnectionManager {
       const target = getBoxAt(e.clientX, e.clientY);
       if (target && target.index !== dragSourceBox.index) {
         toggle(dragSourceBox.index, target.index);
+        bop(target.element);
       }
     }
 
@@ -392,6 +407,7 @@ export function setupConnections(boxes: BoxInfo[]): ConnectionManager {
       .forEach((b) => b.classList.remove("is-target-valid"));
     dragging = false;
     dragSourceBox = null;
+    hoveredBoxIndex = null;
     previewPath().setAttribute("d", "");
   };
 
@@ -405,6 +421,7 @@ export function setupConnections(boxes: BoxInfo[]): ConnectionManager {
       .forEach((b) => b.classList.remove("is-target-valid"));
     dragging = false;
     dragSourceBox = null;
+    hoveredBoxIndex = null;
     previewPath().setAttribute("d", "");
   });
 

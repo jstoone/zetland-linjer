@@ -103,6 +103,15 @@
         pointer-events: none;
       }
 
+      @keyframes bop {
+        0%   { transform: scale(1); }
+        25%  { transform: scale(1.07); }
+        100% { transform: scale(1); }
+      }
+      .box.is-bop {
+        animation: bop 0.3s cubic-bezier(0.2, 0, 0.2, 1);
+      }
+
       .box:hover {
         background: #FFF0E0;
         border-color: #E0D0BE;
