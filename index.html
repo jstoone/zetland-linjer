@@ -133,6 +133,8 @@
         color: var(--text);
         text-align: center;
         pointer-events: none;
+        hyphens: auto;
+        overflow-wrap: break-word;
       }
 
       .box-year {
@@ -174,11 +176,11 @@
 
       #undo-toast {
         position: fixed;
-        bottom: 80px;
+        bottom: 24px;
         left: 50%;
         transform: translateX(-50%);
-        padding: 10px 24px;
-        font-size: 14px;
+        padding: 10px 28px;
+        font-size: 15px;
         font-family: var(--font);
         color: var(--text-white);
         background: var(--accent);
